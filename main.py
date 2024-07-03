@@ -166,7 +166,7 @@ def main(params):
 
     # Define the codec and create VideoWriter object
     out = cv2.VideoWriter(
-        "friends_out.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height)
+        "output_video.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height)
     )
 
     while True:
