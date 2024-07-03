@@ -1,0 +1,6 @@
+onnx==1.16.1
+onnxruntime==1.18.1
+onnxruntime-gpu==1.18.0
+opencv-python==4.9.0.80
+numpy==1.24.4
+scikit-image==0.23.2
