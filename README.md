@@ -2,7 +2,8 @@
 
 ![Downloads](https://img.shields.io/github/downloads/yakhyo/face-reidentification/total)
 
-<video controls autoplay loop src="https://github.com/yakhyo/face-reidentification/raw/main/assets/demo.mp4" muted="false"></video>
+<video controls autoplay loop src="https://github.com/yakhyo/face-reidentification/assets/28424328/441880b0-1e43-4c28-9f63-b32bc9b6e6b4" muted="false"></video>
+
 This repository implements face re-identification using SCRFD for face detection and ArcFace for face recognition. It supports inference from webcam or video sources.
 
 ## Features
@@ -52,6 +53,14 @@ pip install -r requirements.txt
 ```bash
 sh download.sh
 ```
+
+4. Put target faces into `faces` folder
+```
+faces/
+    ├── name1.jpg
+    ├── name2.jpg
+```
+Those file names will be displayed while real-time inference.
 
 ## Usage
 
