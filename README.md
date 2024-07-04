@@ -26,6 +26,9 @@ Project folder structure:
 │   ├── __init__.py
 │   ├── scrfd.py
 │   └── arcface.py
+├── weights/
+│   ├── det_10g.onnx
+│   └── w600k_r50.onnx
 ├── utils/
 │   └── helpers.py
 ├── main.py
