@@ -53,14 +53,18 @@ pip install -r requirements.txt
 
 3. Download weight files:
 
-Windows:
-- [ArcFace weights](https://github.com/yakhyo/face-reidentification/releases/download/v0.0.1/w600k_r50.onnx)
-- [SCRFD weights](https://github.com/yakhyo/face-reidentification/releases/download/v0.0.1/det_10g.onnx)
+    a) Download weights from following links:
+   
+    | Model   | Weights                                                                                         |
+    |---------|-------------------------------------------------------------------------------------------------|
+    | ArcFace | [w600k_r50.onnx](https://github.com/yakhyo/face-reidentification/releases/download/v0.0.1/w600k_r50.onnx) |
+    | SCRFD   | [det_10g.onnx](https://github.com/yakhyo/face-reidentification/releases/download/v0.0.1/det_10g.onnx)   |
+     
+     b) Run below command to download weights to `weights` directory (linux):
 
-Linux:
-```bash
-sh download.sh
-```
+    ```bash
+    sh download.sh
+    ```
 
 4. Put target faces into `faces` folder
 ```
