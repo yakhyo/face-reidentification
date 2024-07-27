@@ -88,9 +88,7 @@ def build_targets(
         image_path = os.path.join(params.faces_dir, filename)
 
         image = cv2.imread(image_path)
-        bboxes, kpss = detector.detect(
-            image, input_size=(640, 640), thresh=params.confidence_thresh, max_num=1
-        )
+        bboxes, kpss = detector.detect(image, max_num=1)
 
         if len(kpss) == 0:
             logging.warning(f"No face detected in {image_path}. Skipping...")
@@ -110,12 +108,7 @@ def frame_processor(
     colors: dict,
     params,
 ) -> np.ndarray:
-    bboxes, kpss = detector.detect(
-        frame,
-        input_size=(640, 640),
-        thresh=params.confidence_thresh,
-        max_num=params.max_num,
-    )
+    bboxes, kpss = detector.detect(frame, params.max_num)
 
     for bbox, kps in zip(bboxes, kpss):
         x1, y1, x2, y2, score = bbox.astype(np.int32)
@@ -147,7 +140,7 @@ def frame_processor(
 def main(params):
     setup_logging(params.log_level)
 
-    detector = SCRFD(params.det_weight)
+    detector = SCRFD(params.det_weight, input_size=(640, 640), conf_thres=params.confidence_thresh)
     recognizer = ArcFaceONNX(params.rec_weight)
 
     targets = build_targets(detector, recognizer, params)

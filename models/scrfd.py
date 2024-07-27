@@ -4,7 +4,7 @@ import numpy as np
 import onnxruntime
 
 from utils.helpers import distance2bbox, distance2kps
-
+from typing import Tuple
 
 class SCRFD:
     """
@@ -12,72 +12,57 @@ class SCRFD:
     Paper: https://arxiv.org/abs/2105.04714
     """
 
-    def __init__(self, model_file=None, session=None):
-        self.model_file = model_file
-        self.session = session
-        self.taskname = "detection"
-        self.batched = False
+    def __init__(
+        self,
+        model_path: str,
+        input_size: Tuple[int] = (640, 640),
+        conf_thres: float = 0.5,
+        iou_thres: float = 0.4
+    ) -> None:
+        """SCRFD initialization
 
-        if self.session is None:
-            assert self.model_file is not None
-            assert os.path.exists(self.model_file)
-            self.session = onnxruntime.InferenceSession(
-                self.model_file,
-                providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
-            )
+        Args:
+            model_path (str): Path model .onnx file.
+            input_size (int): Input image size. Defaults to (640, 640)
+            conf_thres (float, optional): Confidence threshold. Defaults to 0.5.
+            iou_thres (float, optional): Non-max supression (NMS) threshold. Defaults to 0.4.
+        """
 
-        self.center_cache = {}
-        self.nms_thresh = 0.4
-        self.det_thresh = 0.5
-        self._init_vars()
+        self.input_size = input_size
+        self.conf_thres = conf_thres
+        self.iou_thres = iou_thres
 
-    def _init_vars(self):
+        # SCRFD model params --------------
+        self.fmc = 3
+        self._feat_stride_fpn = [8, 16, 32]
+        self._num_anchors = 2
+        self.use_kps = True
+
         self.mean = 127.5
         self.std = 128.0
 
-        input_cfg = self.session.get_inputs()[0]
-        input_shape = input_cfg.shape
-        # print(input_shape)
-        if isinstance(input_shape[2], str):
-            self.input_size = None
-        else:
-            self.input_size = tuple(input_shape[2:4][::-1])
+        self.center_cache = {}
+        # ---------------------------------
 
-        input_name = input_cfg.name
-        self.input_shape = input_shape
+        self._initialize_model(model_path=model_path)
 
-        outputs = self.session.get_outputs()
-        if len(outputs[0].shape) == 3:
-            self.batched = True
+    def _initialize_model(self, model_path: str):
+        """Initialize the model from the given path.
 
-        output_names = []
-        for output in outputs:
-            output_names.append(output.name)
-
-        self.input_name = input_name
-        self.output_names = output_names
-
-        self.use_kps = False
-        self._anchor_ratio = 1.0
-        self._num_anchors = 1
-        if len(outputs) == 6:
-            self.fmc = 3
-            self._feat_stride_fpn = [8, 16, 32]
-            self._num_anchors = 2
-        elif len(outputs) == 9:
-            self.fmc = 3
-            self._feat_stride_fpn = [8, 16, 32]
-            self._num_anchors = 2
-            self.use_kps = True
-        elif len(outputs) == 10:
-            self.fmc = 5
-            self._feat_stride_fpn = [8, 16, 32, 64, 128]
-            self._num_anchors = 1
-        elif len(outputs) == 15:
-            self.fmc = 5
-            self._feat_stride_fpn = [8, 16, 32, 64, 128]
-            self._num_anchors = 1
-            self.use_kps = True
+        Args:
+            model_path (str): Path to .onnx model.
+        """
+        try:
+            self.session = onnxruntime.InferenceSession(
+                model_path,
+                providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
+            )
+            # Get model info
+            self.output_names = [x.name for x in self.session.get_outputs()]
+            self.input_names = [x.name for x in self.session.get_inputs()]
+        except Exception as e:
+            print(f"Failed to load the model: {e}")
+            raise
 
     def forward(self, image, threshold):
         scores_list = []
@@ -92,25 +77,18 @@ class SCRFD:
             (self.mean, self.mean, self.mean),
             swapRB=True
         )
-        outputs = self.session.run(self.output_names, {self.input_name: blob})
+        outputs = self.session.run(self.output_names, {self.input_names[0]: blob})
 
         input_height = blob.shape[2]
         input_width = blob.shape[3]
 
         fmc = self.fmc
         for idx, stride in enumerate(self._feat_stride_fpn):
-            if self.batched:  # If model support batch dim, take first output
-                scores = outputs[idx][0]
-                bbox_preds = outputs[idx + fmc][0]
-                bbox_preds = bbox_preds * stride
-                if self.use_kps:
-                    kps_preds = outputs[idx + fmc * 2][0] * stride
-            else:  # If model doesn't support batching take output as is
-                scores = outputs[idx]
-                bbox_preds = outputs[idx + fmc]
-                bbox_preds = bbox_preds * stride
-                if self.use_kps:
-                    kps_preds = outputs[idx + fmc * 2] * stride
+            scores = outputs[idx]
+            bbox_preds = outputs[idx + fmc]
+            bbox_preds = bbox_preds * stride
+            if self.use_kps:
+                kps_preds = outputs[idx + fmc * 2] * stride
 
             height = input_height // stride
             width = input_width // stride
@@ -138,26 +116,25 @@ class SCRFD:
                 kpss_list.append(pos_kpss)
         return scores_list, bboxes_list, kpss_list
 
-    def detect(self, image, input_size=None, thresh=None, max_num=0, metric="default"):
-        assert input_size is not None or self.input_size is not None
-        input_size = self.input_size if input_size is None else input_size
+    def detect(self, image, max_num=0, metric="max"):
+        width, height = self.input_size
 
         im_ratio = float(image.shape[0]) / image.shape[1]
-        model_ratio = float(input_size[1]) / input_size[0]
+        model_ratio = height / width
         if im_ratio > model_ratio:
-            new_height = input_size[1]
+            new_height = height
             new_width = int(new_height / im_ratio)
         else:
-            new_width = input_size[0]
+            new_width = width
             new_height = int(new_width * im_ratio)
 
         det_scale = float(new_height) / image.shape[0]
         resized_image = cv2.resize(image, (new_width, new_height))
-        det_image = np.zeros((input_size[1], input_size[0], 3), dtype=np.uint8)
-        det_image[:new_height, :new_width, :] = resized_image
-        det_thresh = thresh if thresh is not None else self.det_thresh
 
-        scores_list, bboxes_list, kpss_list = self.forward(det_image, det_thresh)
+        det_image = np.zeros((height, width, 3), dtype=np.uint8)
+        det_image[:new_height, :new_width, :] = resized_image
+
+        scores_list, bboxes_list, kpss_list = self.forward(det_image, self.conf_thres)
 
         scores = np.vstack(scores_list)
         scores_ravel = scores.ravel()
@@ -169,7 +146,7 @@ class SCRFD:
 
         pre_det = np.hstack((bboxes, scores)).astype(np.float32, copy=False)
         pre_det = pre_det[order, :]
-        keep = self.nms(pre_det, thresh=self.nms_thresh)
+        keep = self.nms(pre_det, iou_thres=self.iou_thres)
         det = pre_det[keep, :]
         if self.use_kps:
             kpss = kpss[order, :, :]
@@ -190,14 +167,14 @@ class SCRFD:
                 values = area
             else:
                 values = (area - offset_dist_squared * 2.0)  # some extra weight on the centering
-            bindex = np.argsort(values)[::-1]  # some extra weight on the centering
+            bindex = np.argsort(values)[::-1]
             bindex = bindex[0:max_num]
             det = det[bindex, :]
             if kpss is not None:
                 kpss = kpss[bindex, :]
         return det, kpss
 
-    def nms(self, dets, thresh):
+    def nms(self, dets, iou_thres):
         x1 = dets[:, 0]
         y1 = dets[:, 1]
         x2 = dets[:, 2]
@@ -221,14 +198,14 @@ class SCRFD:
             inter = w * h
             ovr = inter / (areas[i] + areas[order[1:]] - inter)
 
-            indices = np.where(ovr <= thresh)[0]
+            indices = np.where(ovr <= iou_thres)[0]
             order = order[indices + 1]
 
         return keep
 
 
 if __name__ == "__main__":
-    detector = SCRFD(model_file="./weights/det_10g.onnx")
+    detector = SCRFD(model_path="./weights/det_10g.onnx")
     cap = cv2.VideoCapture(0)
 
     while True:
@@ -236,19 +213,14 @@ if __name__ == "__main__":
         if not cap.isOpened():
             break
 
-        boxes_list, points_list = detector.detect(frame, input_size=(640, 640))
-
-        if points_list is not None:
-            print(points_list.shape)
+        boxes_list, points_list = detector.detect(frame)
 
         for boxes, points in zip(boxes_list, points_list):
             x1, y1, x2, y2, score = boxes.astype(np.int32)
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
+            draw_corners(frame, boxes)
 
             if points_list is not None:
-                for point in points:
-                    point = point.astype(np.int32)
-                    cv2.circle(frame, tuple(point), 1, (0, 0, 255), 2)
+                draw_keypoints(frame, points)
 
         cv2.imshow("FaceDetection", frame)
         if cv2.waitKey(1) & 0xFF == ord("q"):
