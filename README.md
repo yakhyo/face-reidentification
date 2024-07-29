@@ -69,8 +69,6 @@ pip install -r requirements.txt
    | ArcFace MobileFace | [w600k_mbf.onnx](https://github.com/yakhyo/face-reidentification/releases/download/v0.0.1/w600k_mbf.onnx) | 12.99 MB |
    | ArcFace ResNet-50  | [w600k_r50.onnx](https://github.com/yakhyo/face-reidentification/releases/download/v0.0.1/w600k_r50.onnx) | 166 MB   |
 
-   |
-
    b) Run below command to download weights to `weights` directory (linux):
 
    ```bash
