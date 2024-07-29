@@ -1,2 +1,2 @@
-from .arcface import ArcFaceONNX
+from .arcface import ArcFace
 from .scrfd import SCRFD

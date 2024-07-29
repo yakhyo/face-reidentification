@@ -1,16 +1,19 @@
 # Face Re-Identification with SCRFD and ArcFace
 
-![Downloads](https://img.shields.io/github/downloads/yakhyo/face-reidentification/total)  [![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/yakhyo/face-reidentification)
+![Downloads](https://img.shields.io/github/downloads/yakhyo/face-reidentification/total) [![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/yakhyo/face-reidentification)
 
 <video controls autoplay loop src="https://github.com/yakhyo/face-reidentification/assets/28424328/441880b0-1e43-4c28-9f63-b32bc9b6e6b4" muted="false" width="100%"></video>
 
 This repository implements face re-identification using SCRFD for face detection and ArcFace for face recognition. It supports inference from webcam or video sources.
 
-## Features
+## Features (Updated on: 2024.07.29)
 
-- **Face Detection**: Utilizes [Sample and Computation Redistribution for Efficient Face Detection](https://arxiv.org/abs/2105.04714) (SCRFD) for efficient and accurate face detection.
-- **Face Recognition**: Employs [ArcFace: Additive Angular Margin Loss for Deep Face Recognition](https://arxiv.org/abs/1801.07698) for robust face recognition.
-- **Real-Time Inference**: Supports both webcam and video file input for real-time processing.
+- [x] Smaller versions of SCFRD face detection model has been added
+- [x] **Face Detection**: Utilizes [Sample and Computation Redistribution for Efficient Face Detection](https://arxiv.org/abs/2105.04714) (SCRFD) for efficient and accurate face detection. (Updated on: 2024.07.29)
+  - Added models: SCRFD 500M (2.41 MB), SCRFD 2.5G (3.14 MB)
+- [x] **Face Recognition**: Employs [ArcFace: Additive Angular Margin Loss for Deep Face Recognition](https://arxiv.org/abs/1801.07698) for robust face recognition. (Updated on: 2024.07.29)
+  - Added models: ArcFace MobileFace (12.99 MB)
+- [x] **Real-Time Inference**: Supports both webcam and video file input for real-time processing.
 
 Project folder structure:
 
@@ -28,7 +31,10 @@ Project folder structure:
 │   └── arcface.py
 ├── weights/
 │   ├── det_10g.onnx
-│   └── w600k_r50.onnx
+│   ├── det_2.5g.onnx
+│   ├── det_500m.onnx
+│   ├── w600k_r50.onnx
+│   └── w600k_mbf.onnx
 ├── utils/
 │   └── helpers.py
 ├── main.py
@@ -53,25 +59,32 @@ pip install -r requirements.txt
 
 3. Download weight files:
 
-    a) Download weights from following links:
-   
-    | Model   | Weights                                                                                         |
-    |---------|-------------------------------------------------------------------------------------------------|
-    | ArcFace | [w600k_r50.onnx](https://github.com/yakhyo/face-reidentification/releases/download/v0.0.1/w600k_r50.onnx) |
-    | SCRFD   | [det_10g.onnx](https://github.com/yakhyo/face-reidentification/releases/download/v0.0.1/det_10g.onnx)   |
-     
-     b) Run below command to download weights to `weights` directory (linux):
+   a) Download weights from following links:
 
-    ```bash
-    sh download.sh
-    ```
+   | Model              | Weights                                                                                                   | Size     |
+   | ------------------ | --------------------------------------------------------------------------------------------------------- | -------- |
+   | SCRFD 500M         | [det_500m.onnx](https://github.com/yakhyo/face-reidentification/releases/download/v0.0.1/det_500m.onnx)   | 2.41 MB  |
+   | SCRFD 2.5G         | [det_2.5g.onnx](https://github.com/yakhyo/face-reidentification/releases/download/v0.0.1/det_2.5g.onnx)   | 3.14 MB  |
+   | SCRFD 10G          | [det_10g.onnx](https://github.com/yakhyo/face-reidentification/releases/download/v0.0.1/det_10g.onnx)     | 16.1 MB  |
+   | ArcFace MobileFace | [w600k_mbf.onnx](https://github.com/yakhyo/face-reidentification/releases/download/v0.0.1/w600k_mbf.onnx) | 12.99 MB |
+   | ArcFace ResNet-50  | [w600k_r50.onnx](https://github.com/yakhyo/face-reidentification/releases/download/v0.0.1/w600k_r50.onnx) | 166 MB   |
+
+   |
+
+   b) Run below command to download weights to `weights` directory (linux):
+
+   ```bash
+   sh download.sh
+   ```
 
 4. Put target faces into `faces` folder
+
 ```
 faces/
     ├── name1.jpg
     ├── name2.jpg
 ```
+
 Those file names will be displayed while real-time inference.
 
 ## Usage

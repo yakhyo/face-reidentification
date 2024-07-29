@@ -6,6 +6,9 @@ import onnxruntime
 from utils.helpers import distance2bbox, distance2kps
 from typing import Tuple
 
+__all__ = ["SCRFD"]
+
+
 class SCRFD:
     """
     Title: "Sample and Computation Redistribution for Efficient Face Detection"

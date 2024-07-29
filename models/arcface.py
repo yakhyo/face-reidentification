@@ -4,8 +4,10 @@ import onnxruntime
 
 from utils.helpers import norm_crop_image
 
+__all__ = ["ArcFace"]
 
-class ArcFaceONNX:
+
+class ArcFace:
     def __init__(self, model_path: str = None, session=None) -> None:
         self.session = session
         self.input_mean = 127.5

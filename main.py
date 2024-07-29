@@ -3,15 +3,13 @@ import cv2
 import random
 import warnings
 import argparse
-import onnxruntime
-import numpy as np
 import logging
+import numpy as np
 
-
-from models import SCRFD, ArcFaceONNX
-from utils.helpers import draw_fancy_bbox, compute_similarity
+import onnxruntime
 from typing import Union, List, Tuple
-
+from models import SCRFD, ArcFace
+from utils.helpers import compute_similarity, draw_bbox_info, draw_bbox
 
 warnings.filterwarnings("ignore")
 
@@ -22,42 +20,50 @@ def parse_args():
         "--det-weight",
         type=str,
         default="./weights/det_10g.onnx",
-        help="Path to detection model",
+        help="Path to detection model"
     )
     parser.add_argument(
         "--rec-weight",
         type=str,
         default="./weights/w600k_r50.onnx",
-        help="Path to recognition model",
+        help="Path to recognition model"
     )
     parser.add_argument(
         "--similarity-thresh",
         type=float,
         default=0.4,
-        help="Similarity threshold between faces",
+        help="Similarity threshold between faces"
     )
     parser.add_argument(
         "--confidence-thresh",
         type=float,
         default=0.5,
-        help="Confidence threshold for face detection",
+        help="Confidence threshold for face detection"
     )
     parser.add_argument(
-        "--faces-dir", type=str, default="./faces", help="Path to faces stored dir"
+        "--faces-dir",
+        type=str,
+        default="./faces",
+        help="Path to faces stored dir"
     )
     parser.add_argument(
         "--source",
         type=str,
-        default="0",
-        help="Video file or video camera source. i.e 0 - webcam",
+        default="./assets/in_video.mp4",
+        help="Video file or video camera source. i.e 0 - webcam"
     )
     parser.add_argument(
         "--max-num",
         type=int,
-        default=10,
-        help="Maximum number of face detections from a frame",
+        default=0,
+        help="Maximum number of face detections from a frame"
     )
-    parser.add_argument("--log-level", type=str, default="INFO", help="Logging level")
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default="INFO",
+        help="Logging level"
+    )
 
     return parser.parse_args()
 
@@ -69,18 +75,17 @@ def setup_logging(level: str) -> None:
     )
 
 
-def build_targets(
-    detector, recognizer, params: argparse.Namespace
-) -> Union[Tuple[np.ndarray, str]]:
-    """Builds targets using face detection and recognition.
+def build_targets(detector, recognizer, params: argparse.Namespace) -> List[Tuple[np.ndarray, str]]:
+    """
+    Build targets using face detection and recognition.
 
     Args:
         detector (SCRFD): Face detector model.
         recognizer (ArcFaceONNX): Face recognizer model.
-        image_folder (str): Path to the folder containing images.
+        params (argparse.Namespace): Command line arguments.
 
     Returns:
-        List[Tuple[np.ndarray, str]]: A list where each tuple contains a feature vector and the corresponding image name.
+        List[Tuple[np.ndarray, str]]: A list of tuples containing feature vectors and corresponding image names.
     """
     targets = []
     for filename in os.listdir(params.faces_dir):
@@ -94,24 +99,38 @@ def build_targets(
             logging.warning(f"No face detected in {image_path}. Skipping...")
             continue
 
-        feature_vector = recognizer(image, kpss[0])
-        targets.append((feature_vector, name))
+        embedding = recognizer(image, kpss[0])
+        targets.append((embedding, name))
 
     return targets
 
 
 def frame_processor(
     frame: np.ndarray,
-    detector,
-    recognizer,
+    detector: SCRFD,
+    recognizer: ArcFace,
     targets: List[Tuple[np.ndarray, str]],
     colors: dict,
-    params,
+    params: argparse.Namespace
 ) -> np.ndarray:
+    """
+    Process a video frame for face detection and recognition.
+
+    Args:
+        frame (np.ndarray): The video frame.
+        detector (SCRFD): Face detector model.
+        recognizer (ArcFace): Face recognizer model.
+        targets (List[Tuple[np.ndarray, str]]): List of target feature vectors and names.
+        colors (dict): Dictionary of colors for drawing bounding boxes.
+        params (argparse.Namespace): Command line arguments.
+
+    Returns:
+        np.ndarray: The processed video frame.
+    """
     bboxes, kpss = detector.detect(frame, params.max_num)
 
     for bbox, kps in zip(bboxes, kpss):
-        x1, y1, x2, y2, score = bbox.astype(np.int32)
+        *bbox, conf_score = bbox.astype(np.int32)
         embedding = recognizer(frame, kps)
 
         max_similarity = 0
@@ -124,15 +143,9 @@ def frame_processor(
 
         if best_match_name != "Unknown":
             color = colors[best_match_name]
-            draw_fancy_bbox(
-                frame,
-                bbox,
-                similarity=max_similarity,
-                name=best_match_name,
-                color=color,
-            )
+            draw_bbox_info(frame, bbox, similarity=max_similarity, name=best_match_name, color=color)
         else:
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), thickness=2)
+            draw_bbox(frame, bbox, (255, 0, 0))
 
     return frame
 
@@ -141,13 +154,10 @@ def main(params):
     setup_logging(params.log_level)
 
     detector = SCRFD(params.det_weight, input_size=(640, 640), conf_thres=params.confidence_thresh)
-    recognizer = ArcFaceONNX(params.rec_weight)
+    recognizer = ArcFace(params.rec_weight)
 
     targets = build_targets(detector, recognizer, params)
-    colors = {
-        name: (random.randint(0, 256), random.randint(0, 256), random.randint(0, 256))
-        for _, name in targets
-    }
+    colors = {name: (random.randint(0, 256), random.randint(0, 256), random.randint(0, 256)) for _, name in targets}
 
     cap = cv2.VideoCapture(params.source)
     if not cap.isOpened():
@@ -157,26 +167,14 @@ def main(params):
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS)
 
-    # Define the codec and create VideoWriter object
-    out = cv2.VideoWriter(
-        "output_video.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height)
-    )
+    out = cv2.VideoWriter("output_video.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
 
     while True:
         ret, frame = cap.read()
-
         if not ret:
             break
 
-        frame = frame_processor(
-            frame=frame,
-            detector=detector,
-            recognizer=recognizer,
-            targets=targets,
-            colors=colors,
-            params=params,
-        )
-
+        frame = frame_processor(frame, detector, recognizer, targets, colors, params)
         out.write(frame)
         cv2.imshow("Frame", frame)
 
@@ -190,8 +188,6 @@ def main(params):
 
 if __name__ == "__main__":
     args = parse_args()
-
     if args.source.isdigit():
         args.source = int(args.source)
-
     main(args)

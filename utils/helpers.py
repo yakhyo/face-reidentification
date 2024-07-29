@@ -123,8 +123,37 @@ def compute_similarity(feat1: np.ndarray, feat2: np.ndarray) -> np.float32:
     return similarity
 
 
-def draw_fancy_bbox(frame, bbox, similarity, name, color):
-    x1, y1, x2, y2, score = bbox.astype(np.int32)
+def draw_bbox(image, bbox, color=(0, 255, 0), thickness=3, proportion=0.2):
+    x1, y1, x2, y2 = map(int, bbox)
+    width = x2 - x1
+    height = y2 - y1
+
+    corner_length = int(proportion * min(width, height))
+
+    # Draw the rectangle
+    cv2.rectangle(image, (x1, y1), (x2, y2), color, 1)
+
+    # Top-left corner
+    cv2.line(image, (x1, y1), (x1 + corner_length, y1), color, thickness)
+    cv2.line(image, (x1, y1), (x1, y1 + corner_length), color, thickness)
+
+    # Top-right corner
+    cv2.line(image, (x2, y1), (x2 - corner_length, y1), color, thickness)
+    cv2.line(image, (x2, y1), (x2, y1 + corner_length), color, thickness)
+
+    # Bottom-left corner
+    cv2.line(image, (x1, y2), (x1, y2 - corner_length), color, thickness)
+    cv2.line(image, (x1, y2), (x1 + corner_length, y2), color, thickness)
+
+    # Bottom-right corner
+    cv2.line(image, (x2, y2), (x2, y2 - corner_length), color, thickness)
+    cv2.line(image, (x2, y2), (x2 - corner_length, y2), color, thickness)
+
+    return image
+
+
+def draw_bbox_info(frame, bbox, similarity, name, color):
+    x1, y1, x2, y2 = map(int, bbox)
 
     cv2.putText(
         frame,
@@ -137,7 +166,7 @@ def draw_fancy_bbox(frame, bbox, similarity, name, color):
     )
 
     # Draw bounding box
-    cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness=2)
+    draw_bbox(frame, bbox, color)
 
     # Draw similarity bar
     rect_x_start = x2 + 10
@@ -148,4 +177,3 @@ def draw_fancy_bbox(frame, bbox, similarity, name, color):
 
     # Draw the filled rectangle
     cv2.rectangle(frame, (rect_x_start, rect_y_start), (rect_x_end, rect_y_end), color, cv2.FILLED)
-
