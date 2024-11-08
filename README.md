@@ -1,6 +1,8 @@
 # Face Re-Identification with SCRFD and ArcFace
 
-![Downloads](https://img.shields.io/github/downloads/yakhyo/face-reidentification/total) [![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/yakhyo/face-reidentification)
+![Downloads](https://img.shields.io/github/downloads/yakhyo/face-reidentification/total) 
+[![GitHub Repo stars](https://img.shields.io/github/stars/yakhyo/face-reidentification)](https://github.com/yakhyo/face-reidentification/stargazers)
+[![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/yakhyo/face-reidentification)
 
 <video controls autoplay loop src="https://github.com/yakhyo/face-reidentification/assets/28424328/441880b0-1e43-4c28-9f63-b32bc9b6e6b4" muted="false" width="100%"></video>
 
