@@ -5,15 +5,15 @@ import warnings
 import argparse
 import logging
 import numpy as np
-import faiss
-import pickle
 
-import onnxruntime
-from typing import Union, List, Tuple, Dict, Any
+from database import FaceDatabase
 from models import SCRFD, ArcFace
+from utils.logging import setup_logging
 from utils.helpers import compute_similarity, draw_bbox_info, draw_bbox
 
+
 warnings.filterwarnings("ignore")
+setup_logging(log_to_file=True)
 
 
 def parse_args():
@@ -27,7 +27,7 @@ def parse_args():
     parser.add_argument(
         "--rec-weight",
         type=str,
-        default="./weights/w600k_r50.onnx",
+        default="./weights/w600k_mbf.onnx",
         help="Path to recognition model"
     )
     parser.add_argument(
@@ -60,16 +60,11 @@ def parse_args():
         default=0,
         help="Maximum number of face detections from a frame"
     )
-    parser.add_argument(
-        "--log-level",
-        type=str,
-        default="INFO",
-        help="Logging level"
-    )
+
     parser.add_argument(
         "--db-path",
         type=str,
-        default="./face_database",
+        default="./database/face_database",
         help="Path to store the FAISS database and metadata"
     )
     parser.add_argument(
@@ -81,135 +76,32 @@ def parse_args():
     return parser.parse_args()
 
 
-def setup_logging(level: str) -> None:
-    logging.basicConfig(
-        level=getattr(logging, level.upper(), None),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-
-
-class FaceDatabase:
-    """FAISS-based face database for efficient similarity search"""
-    
-    def __init__(self, embedding_size: int = 512, db_path: str = "./face_database"):
-        """
-        Initialize the face database.
-        
-        Args:
-            embedding_size: Dimension of face embeddings
-            db_path: Directory to store database files
-        """
-        self.embedding_size = embedding_size
-        self.db_path = db_path
-        self.index_file = os.path.join(db_path, "faiss_index.bin")
-        self.meta_file = os.path.join(db_path, "metadata.pkl")
-        
-        # Create directory if it doesn't exist
-        os.makedirs(db_path, exist_ok=True)
-        
-        # Initialize FAISS index for L2 distance (can be converted to similarity)
-        self.index = faiss.IndexFlatIP(embedding_size)  # Inner product for cosine similarity
-        
-        # Metadata to store names corresponding to indices
-        self.metadata = []
-        
-    def add_face(self, embedding: np.ndarray, name: str) -> None:
-        """
-        Add a face embedding to the database.
-        
-        Args:
-            embedding: Face embedding vector
-            name: Name of the person
-        """
-        # Normalize for cosine similarity
-        normalized_embedding = embedding / np.linalg.norm(embedding)
-        self.index.add(np.array([normalized_embedding], dtype=np.float32))
-        self.metadata.append(name)
-        
-    def search(self, embedding: np.ndarray, threshold: float = 0.4) -> Tuple[str, float]:
-        """
-        Search for the closest face in the database.
-        
-        Args:
-            embedding: Query face embedding
-            threshold: Similarity threshold
-            
-        Returns:
-            Tuple containing the name and similarity score
-        """
-        if self.index.ntotal == 0:
-            return "Unknown", 0.0
-            
-        # Normalize query embedding
-        normalized_embedding = embedding / np.linalg.norm(embedding)
-        
-        # Search for the closest match
-        similarities, indices = self.index.search(np.array([normalized_embedding], dtype=np.float32), 1)
-        
-        # Get the best match
-        best_similarity = similarities[0][0]
-        best_idx = indices[0][0]
-        
-        # Check if similarity exceeds threshold
-        if best_similarity > threshold and best_idx < len(self.metadata):
-            return self.metadata[best_idx], best_similarity
-        else:
-            return "Unknown", best_similarity
-            
-    def save(self) -> None:
-        """Save the database to disk"""
-        faiss.write_index(self.index, self.index_file)
-        with open(self.meta_file, 'wb') as f:
-            pickle.dump(self.metadata, f)
-        logging.info(f"Face database saved with {self.index.ntotal} faces")
-            
-    def load(self) -> bool:
-        """
-        Load the database from disk.
-        
-        Returns:
-            bool: True if loaded successfully, False otherwise
-        """
-        if os.path.exists(self.index_file) and os.path.exists(self.meta_file):
-            self.index = faiss.read_index(self.index_file)
-            with open(self.meta_file, 'rb') as f:
-                self.metadata = pickle.load(f)
-            logging.info(f"Loaded face database with {self.index.ntotal} faces")
-            return True
-        return False
-
-
-def build_face_database(
-    detector: SCRFD, 
-    recognizer: ArcFace, 
-    params: argparse.Namespace,
-    force_update: bool = False
-) -> FaceDatabase:
+def build_face_database(detector: SCRFD, recognizer: ArcFace, params: argparse.Namespace, force_update: bool = False) -> FaceDatabase:
     """
     Build or load the face database.
-    
+
     Args:
         detector: Face detector model
         recognizer: Face recognizer model
         params: Command line arguments
         force_update: Force rebuild of the database
-        
+
     Returns:
         FaceDatabase: The face database
     """
     # Initialize the database
     face_db = FaceDatabase(db_path=params.db_path)
-    
+
     # Try to load existing database unless force update is specified
     if not force_update and face_db.load():
         return face_db
-        
+
     # Build database from images
     logging.info("Building face database from images...")
     for filename in os.listdir(params.faces_dir):
         if not (filename.endswith('.jpg') or filename.endswith('.png')):
             continue
-            
+
         name = filename.rsplit('.', 1)[0]
         image_path = os.path.join(params.faces_dir, filename)
 
@@ -217,7 +109,7 @@ def build_face_database(
         if image is None:
             logging.warning(f"Could not read image: {image_path}")
             continue
-            
+
         bboxes, kpss = detector.detect(image, max_num=1)
 
         if len(kpss) == 0:
@@ -268,7 +160,7 @@ def frame_processor(
             # Get color from colors dict or generate a new one if not present
             if name not in colors:
                 colors[name] = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-            
+
             color = colors[name]
             draw_bbox_info(frame, bbox, similarity=similarity, name=name, color=color)
         else:
@@ -278,14 +170,13 @@ def frame_processor(
 
 
 def main(params):
-    setup_logging(params.log_level)
 
     detector = SCRFD(params.det_weight, input_size=(640, 640), conf_thres=params.confidence_thresh)
     recognizer = ArcFace(params.rec_weight)
 
     # Build or load face database
     face_db = build_face_database(detector, recognizer, params, force_update=params.update_db)
-    
+
     # Color dictionary for recognized faces
     colors = {}
 

@@ -6,6 +6,7 @@ from onnxruntime import InferenceSession
 
 from utils.helpers import face_alignment
 
+
 __all__ = ["ArcFace"]
 
 logger = getLogger(__name__)
@@ -106,7 +107,7 @@ class ArcFace:
             )
         return face_blob
 
-    def get_embedding(self, image: np.ndarray, landmarks: np.ndarray) -> np.ndarray:
+    def get_embedding(self, image: np.ndarray, landmarks: np.ndarray, normalized: bool = False) -> np.ndarray:
         """
         Extract face embedding from an image using facial landmarks for alignment.
 
@@ -131,11 +132,14 @@ class ArcFace:
             face_blob = self.preprocess(aligned_face)
             embedding = self.session.run(self.output_names, {self.input_name: face_blob})[0]
 
-            # L2 normalization of embedding
-            embedding_norm = np.linalg.norm(embedding, axis=1, keepdims=True)
-            normalized_embedding = embedding / embedding_norm
+            if normalized:
+                # L2 normalization of embedding
+                embedding_norm = np.linalg.norm(embedding, axis=1, keepdims=True)
+                normalized_embedding = embedding / embedding_norm
 
-            return normalized_embedding.flatten()
+                return normalized_embedding.flatten()
+
+            return embedding.flatten()
 
         except Exception as e:
             logger.error(f"Error extracting face embedding: {str(e)}")
