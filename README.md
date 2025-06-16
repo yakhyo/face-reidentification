@@ -1,6 +1,6 @@
-# Face Re-Identification with SCRFD and ArcFace
+# Real-Time Face Re-Identification with FAISS, ArcFace & SCRFD
 
-![Downloads](https://img.shields.io/github/downloads/yakhyo/face-reidentification/total) 
+![Downloads](https://img.shields.io/github/downloads/yakhyo/face-reidentification/total)
 [![GitHub Repo stars](https://img.shields.io/github/stars/yakhyo/face-reidentification)](https://github.com/yakhyo/face-reidentification/stargazers)
 [![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/yakhyo/face-reidentification)
 
@@ -12,12 +12,13 @@
 
 This repository implements face re-identification using SCRFD for face detection and ArcFace for face recognition. It supports inference from webcam or video sources.
 
-## Features (Updated on: 2024.07.29)
+## Features
 
+- [x] FAISS Vector Database Integration: Enables fast and scalable face re-identification using a FAISS index built from facial embeddings. Faces must be placed in the `assets/faces/` directory.
 - [x] Smaller versions of SCFRD face detection model has been added
-- [x] **Face Detection**: Utilizes [Sample and Computation Redistribution for Efficient Face Detection](https://arxiv.org/abs/2105.04714) (SCRFD) for efficient and accurate face detection. (Updated on: 2024.07.29)
+- [x] **Face Detection**: Utilizes [Sample and Computation Redistribution for Efficient Face Detection](https://arxiv.org/abs/2105.04714) (SCRFD) for efficient and accurate face detection.
   - Added models: SCRFD 500M (2.41 MB), SCRFD 2.5G (3.14 MB)
-- [x] **Face Recognition**: Employs [ArcFace: Additive Angular Margin Loss for Deep Face Recognition](https://arxiv.org/abs/1801.07698) for robust face recognition. (Updated on: 2024.07.29)
+- [x] **Face Recognition**: Employs [ArcFace: Additive Angular Margin Loss for Deep Face Recognition](https://arxiv.org/abs/1801.07698) for robust face recognition.
   - Added models: ArcFace MobileFace (12.99 MB)
 - [x] **Real-Time Inference**: Supports both webcam and video file input for real-time processing.
 
@@ -26,11 +27,14 @@ Project folder structure:
 ```
 ├── assets/
 │   ├── demo.mp4
-│   └── in_video.mp4
-├── faces/
-│   ├── face1.jpg
-│   ├── face2.jpg
-│   └── ...
+│   |── in_video.mp4
+|   └── faces/
+│     ├── face1.jpg
+│     ├── face2.jpg
+│     └── ...
+├── database/
+|   ├── __init__.py
+|   └── face_db.py
 ├── models/
 │   ├── __init__.py
 │   ├── scrfd.py
@@ -42,6 +46,7 @@ Project folder structure:
 │   ├── w600k_r50.onnx
 │   └── w600k_mbf.onnx
 ├── utils/
+|   ├── logging.py
 │   └── helpers.py
 ├── main.py
 ├── README.md
@@ -81,7 +86,7 @@ pip install -r requirements.txt
    sh download.sh
    ```
 
-4. Put target faces into `faces` folder
+4. Put target faces into `assets/faces` folder
 
 ```
 faces/
@@ -101,7 +106,7 @@ python main.py --source assets/in_video.mp4
 
 ```
 usage: main.py [-h] [--det-weight DET_WEIGHT] [--rec-weight REC_WEIGHT] [--similarity-thresh SIMILARITY_THRESH] [--confidence-thresh CONFIDENCE_THRESH]
-               [--faces-dir FACES_DIR] [--source SOURCE] [--max-num MAX_NUM] [--log-level LOG_LEVEL]
+               [--faces-dir FACES_DIR] [--source SOURCE] [--max-num MAX_NUM]
 
 Face Detection-and-Recognition
 
@@ -119,8 +124,6 @@ options:
                         Path to faces stored dir
   --source SOURCE       Video file or video camera source. i.e 0 - webcam
   --max-num MAX_NUM     Maximum number of face detections from a frame
-  --log-level LOG_LEVEL
-                        Logging level
 ```
 
 ## Reference

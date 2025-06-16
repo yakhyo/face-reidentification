@@ -1,149 +1,86 @@
 import os
 import cv2
 import random
+import time
 import warnings
 import argparse
 import logging
 import numpy as np
 
-import onnxruntime
-from typing import Union, List, Tuple
+from database import FaceDatabase
 from models import SCRFD, ArcFace
+from utils.logging import setup_logging
 from utils.helpers import compute_similarity, draw_bbox_info, draw_bbox
 
+
 warnings.filterwarnings("ignore")
+setup_logging(log_to_file=True)
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Face Detection-and-Recognition")
-    parser.add_argument(
-        "--det-weight",
-        type=str,
-        default="./weights/det_10g.onnx",
-        help="Path to detection model"
-    )
-    parser.add_argument(
-        "--rec-weight",
-        type=str,
-        default="./weights/w600k_r50.onnx",
-        help="Path to recognition model"
-    )
-    parser.add_argument(
-        "--similarity-thresh",
-        type=float,
-        default=0.4,
-        help="Similarity threshold between faces"
-    )
-    parser.add_argument(
-        "--confidence-thresh",
-        type=float,
-        default=0.5,
-        help="Confidence threshold for face detection"
-    )
-    parser.add_argument(
-        "--faces-dir",
-        type=str,
-        default="./faces",
-        help="Path to faces stored dir"
-    )
-    parser.add_argument(
-        "--source",
-        type=str,
-        default="./assets/in_video.mp4",
-        help="Video file or video camera source. i.e 0 - webcam"
-    )
-    parser.add_argument(
-        "--max-num",
-        type=int,
-        default=0,
-        help="Maximum number of face detections from a frame"
-    )
-    parser.add_argument(
-        "--log-level",
-        type=str,
-        default="INFO",
-        help="Logging level"
-    )
+    parser = argparse.ArgumentParser(description="Face Detection-and-Recognition with FAISS")
+
+    parser.add_argument("--det-weight", type=str, default="./weights/det_10g.onnx", help="Path to detection model")
+    parser.add_argument("--rec-weight", type=str, default="./weights/w600k_mbf.onnx", help="Path to recognition model")
+    parser.add_argument("--similarity-thresh", type=float, default=0.4, help="Similarity threshold between faces")
+    parser.add_argument("--confidence-thresh", type=float, default=0.5, help="Confidence threshold for face detection")
+    parser.add_argument("--faces-dir", type=str, default="./assets/faces", help="Path to faces stored dir")
+    parser.add_argument("--source", type=str, default="./assets/in_video.mp4", help="Video file or webcam source")
+    parser.add_argument("--max-num", type=int, default=0, help="Maximum number of face detections from a frame")
+    parser.add_argument("--db-path", type=str, default="./database/face_database", help="path to vector db and metadata")
+    parser.add_argument("--update-db", action="store_true", help="Force update of the face database")
+    parser.add_argument("--output", type=str, default="output_video.mp4", help="Output path for annotated video")
 
     return parser.parse_args()
 
 
-def setup_logging(level: str) -> None:
-    logging.basicConfig(
-        level=getattr(logging, level.upper(), None),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
+def build_face_database(detector: SCRFD, recognizer: ArcFace, params: argparse.Namespace, force_update: bool = False) -> FaceDatabase:
+    face_db = FaceDatabase(db_path=params.db_path)
 
+    if not force_update and face_db.load():
+        logging.info("Loaded face database from disk.")
+        return face_db
 
-def build_targets(detector, recognizer, params: argparse.Namespace) -> List[Tuple[np.ndarray, str]]:
-    """
-    Build targets using face detection and recognition.
-
-    Args:
-        detector (SCRFD): Face detector model.
-        recognizer (ArcFaceONNX): Face recognizer model.
-        params (argparse.Namespace): Command line arguments.
-
-    Returns:
-        List[Tuple[np.ndarray, str]]: A list of tuples containing feature vectors and corresponding image names.
-    """
-    targets = []
+    logging.info("Building face database from images...")
     for filename in os.listdir(params.faces_dir):
-        name = filename[:-4]
-        image_path = os.path.join(params.faces_dir, filename)
+        if not (filename.endswith('.jpg') or filename.endswith('.png')):
+            continue
 
+        name = filename.rsplit('.', 1)[0]
+        image_path = os.path.join(params.faces_dir, filename)
         image = cv2.imread(image_path)
+
+        if image is None:
+            logging.warning(f"Could not read image: {image_path}")
+            continue
+
         bboxes, kpss = detector.detect(image, max_num=1)
 
         if len(kpss) == 0:
             logging.warning(f"No face detected in {image_path}. Skipping...")
             continue
 
-        embedding = recognizer(image, kpss[0])
-        targets.append((embedding, name))
+        embedding = recognizer.get_embedding(image, kpss[0])
+        face_db.add_face(embedding, name)
+        logging.info(f"Added face for: {name}")
 
-    return targets
+    face_db.save()
+    return face_db
 
 
-def frame_processor(
-    frame: np.ndarray,
-    detector: SCRFD,
-    recognizer: ArcFace,
-    targets: List[Tuple[np.ndarray, str]],
-    colors: dict,
-    params: argparse.Namespace
-) -> np.ndarray:
-    """
-    Process a video frame for face detection and recognition.
-
-    Args:
-        frame (np.ndarray): The video frame.
-        detector (SCRFD): Face detector model.
-        recognizer (ArcFace): Face recognizer model.
-        targets (List[Tuple[np.ndarray, str]]): List of target feature vectors and names.
-        colors (dict): Dictionary of colors for drawing bounding boxes.
-        params (argparse.Namespace): Command line arguments.
-
-    Returns:
-        np.ndarray: The processed video frame.
-    """
+def frame_processor(frame: np.ndarray, detector: SCRFD, recognizer: ArcFace, face_db: FaceDatabase, colors: dict, params: argparse.Namespace) -> np.ndarray:
     bboxes, kpss = detector.detect(frame, params.max_num)
 
     for bbox, kps in zip(bboxes, kpss):
         *bbox, conf_score = bbox.astype(np.int32)
-        embedding = recognizer(frame, kps)
+        embedding = recognizer.get_embedding(frame, kps)
 
-        max_similarity = 0
-        best_match_name = "Unknown"
-        for target, name in targets:
-            similarity = compute_similarity(target, embedding)
-            if similarity > max_similarity and similarity > params.similarity_thresh:
-                max_similarity = similarity
-                best_match_name = name
+        name, similarity = face_db.search(embedding, params.similarity_thresh)
 
-        if best_match_name != "Unknown":
-            color = colors[best_match_name]
-            draw_bbox_info(frame, bbox, similarity=max_similarity, name=best_match_name, color=color)
+        if name != "Unknown":
+            if name not in colors:
+                colors[name] = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+            draw_bbox_info(frame, bbox, similarity=similarity, name=name, color=colors[name])
         else:
             draw_bbox(frame, bbox, (255, 0, 0))
 
@@ -151,43 +88,57 @@ def frame_processor(
 
 
 def main(params):
-    setup_logging(params.log_level)
+    try:
+        detector = SCRFD(params.det_weight, input_size=(640, 640), conf_thres=params.confidence_thresh)
+        recognizer = ArcFace(params.rec_weight)
+    except Exception as e:
+        logging.error(f"Failed to load model weights: {e}")
+        return
 
-    detector = SCRFD(params.det_weight, input_size=(640, 640), conf_thres=params.confidence_thresh)
-    recognizer = ArcFace(params.rec_weight)
+    face_db = build_face_database(detector, recognizer, params, force_update=params.update_db)
+    colors = {}
 
-    targets = build_targets(detector, recognizer, params)
-    colors = {name: (random.randint(0, 256), random.randint(0, 256), random.randint(0, 256)) for _, name in targets}
+    try:
+        cap = cv2.VideoCapture(params.source if not isinstance(params.source, int) else int(params.source))
+        if not cap.isOpened():
+            raise IOError(f"Could not open video source: {params.source}")
 
-    cap = cv2.VideoCapture(params.source)
-    if not cap.isOpened():
-        raise Exception("Could not open video or webcam")
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        out = cv2.VideoWriter(params.output, cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
 
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
+        frame_count = 0
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
 
-    out = cv2.VideoWriter("output_video.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
+            start = time.time()
+            frame = frame_processor(frame, detector, recognizer, face_db, colors, params)
+            end = time.time()
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+            out.write(frame)
 
-        frame = frame_processor(frame, detector, recognizer, targets, colors, params)
-        out.write(frame)
-        cv2.imshow("Frame", frame)
+            cv2.imshow("Face Recognition", frame)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
 
-        if cv2.waitKey(1) & 0xFF == ord("q"):
-            break
+            frame_count += 1
+            logging.debug(f"Frame {frame_count}, FPS: {1 / (end - start):.2f}")
 
-    cap.release()
-    out.release()
-    cv2.destroyAllWindows()
+        logging.info(f"Processed {frame_count} frames.")
+
+    finally:
+        cap.release()
+        out.release()
+        cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    if args.source.isdigit():
+    try:
         args.source = int(args.source)
+    except ValueError:
+        pass
     main(args)
