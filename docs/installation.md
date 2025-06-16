@@ -67,13 +67,14 @@ face-reidentification/
 
 1. Add sample faces to the database:
    ```bash
-   # Copy face images to assets/faces/
-   python main.py --mode add --image assets/faces/person1.jpg --name "Person 1"
+   # Copy face images to assets/faces/ directory
+   # Then update the face database
+   python main.py --faces-dir assets/faces --update-db
    ```
 
 2. Run a test video:
    ```bash
-   python main.py --mode video --input assets/demo.mp4
+   python main.py --source assets/demo.mp4 --output result.mp4
    ```
 
 ## Troubleshooting
