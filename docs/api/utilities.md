@@ -82,7 +82,7 @@ Computes cosine similarity between two embeddings.
 
 #### draw_bbox
 ```python
-def draw_bbox(image: np.ndarray, bbox: np.ndarray, color: tuple = (0, 255, 0), thickness: int = 2) -> np.ndarray
+def draw_bbox(image: np.ndarray, bbox: np.ndarray, color: tuple = (0, 255, 0), thickness: int = 2, proportion: float = 0.2) -> np.ndarray
 ```
 
 Draws a bounding box on an image.
@@ -92,13 +92,14 @@ Draws a bounding box on an image.
 - `bbox` (np.ndarray): Bounding box coordinates [x1, y1, x2, y2]
 - `color` (tuple): RGB color (default: green)
 - `thickness` (int): Line thickness (default: 2)
+- `proportion` (float): Length of corner lines as a proportion of the bounding box dimensions (default: 0.2)
 
 **Returns:**
 - np.ndarray: Image with drawn bounding box
 
 #### draw_bbox_info
 ```python
-def draw_bbox_info(image: np.ndarray, bbox: np.ndarray, name: str, similarity: float) -> np.ndarray
+def draw_bbox_info(image: np.ndarray, bbox: np.ndarray, name: str, similarity: float, color: tuple) -> np.ndarray
 ```
 
 Draws bounding box with identity information.
@@ -108,6 +109,7 @@ Draws bounding box with identity information.
 - `bbox` (np.ndarray): Bounding box coordinates
 - `name` (str): Person's name
 - `similarity` (float): Similarity score
+- `color` (tuple): RGB color for the bounding box and text
 
 **Returns:**
 - np.ndarray: Annotated image

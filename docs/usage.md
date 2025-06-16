@@ -55,7 +55,7 @@ None (all arguments have default values)
 - `--source`: Input source - video file or camera index (default: `./assets/in_video.mp4`)
 - `--max-num`: Maximum faces to detect per frame (default: 0, no limit)
 - `--db-path`: Path to face database (default: `./database/face_database`)
-- `--update-db`: Force update of the face database (flag)
+- `--update-db`: Force creation or update of the face database. Required when building the database for the first time. If not specified and a database already exists, the system will load the existing database instead of rebuilding it. (flag)
 - `--output`: Output video path (default: `output_video.mp4`)
 
 ## Examples

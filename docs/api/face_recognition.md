@@ -25,25 +25,30 @@ Creates a new ArcFace model instance.
 
 #### get_embedding
 ```python
-get_embedding(face_img: np.ndarray) -> np.ndarray
+get_embedding(face_img: np.ndarray, facial_points: np.ndarray) -> np.ndarray
 ```
 
-Extracts a face embedding from an aligned face image.
+Extracts a face embedding from a face image using facial landmarks for alignment.
 
 **Parameters:**
-- `face_img` (np.ndarray): Face image, should be RGB format
+- `face_img` (np.ndarray): Face image in BGR format
+- `facial_points` (np.ndarray): 5 facial landmarks of shape (5, 2) for face alignment
 
 **Returns:**
-- np.ndarray: 512-dimensional face embedding
+- np.ndarray: 512-dimensional face embedding normalized to unit length
 
 **Note:** The method handles:
 - Image resizing to 112x112
 - Normalization (subtract mean, divide by scale)
 - Color format conversion if needed
 
-#### compute_similarity
+**Note:** The `compute_similarity` function is not part of the ArcFace class, but is available as a utility function in `utils/helpers.py`:
+
 ```python
-compute_similarity(embedding1: np.ndarray, embedding2: np.ndarray) -> float
+from utils.helpers import compute_similarity
+
+# Usage
+similarity = compute_similarity(embedding1, embedding2)
 ```
 
 Computes cosine similarity between two face embeddings.
@@ -68,8 +73,8 @@ model = ArcFace("weights/w600k_r50.onnx")  # Will use CUDA if available
 face_img = cv2.imread("face.jpg")
 face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
 
-# Get face embedding
-embedding = model.get_embedding(face_img)
+# Get face embedding (requires facial landmarks)
+embedding = model.get_embedding(face_img, kps)
 
 # Compare with another face
 similarity = model.compute_similarity(embedding, other_embedding)

@@ -35,17 +35,20 @@ def __init__(self,
 def detect(self, image, max_num=0, metric="max")
 ```
 
-Detects faces in an image.
+Detects faces in an image and returns coordinates in the original image space.
 
 ##### Parameters
-- `image` (numpy.ndarray): Input image
+- `image` (numpy.ndarray): Input image in BGR format
 - `max_num` (int): Maximum number of detections (0 for no limit)
-- `metric` (str): Metric for selecting faces ("max" or "center")
+- `metric` (str, optional): Metric for selecting faces when max_num is specified. Options: 
+  - "max": Selects faces with the largest area
+  - "center": Selects faces based on a combined score of area and distance from the image center. Faces closer to the center with reasonable size are prioritized over larger faces at the edges.
+  Default: "max".
 
 ##### Returns
 - tuple: (detections, keypoints)
-  - detections: numpy.ndarray of shape (N, 5) with [x1, y1, x2, y2, score]
-  - keypoints: numpy.ndarray of shape (N, 5, 2) with facial landmarks
+  - detections: numpy.ndarray of shape (N, 5) with [x1, y1, x2, y2, score] in original image coordinates
+  - keypoints: numpy.ndarray of shape (N, 5, 2) with facial landmarks in original image coordinates
 
 #### forward
 ```python
