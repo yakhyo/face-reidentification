@@ -16,6 +16,11 @@ Creates a new ArcFace model instance.
 **Parameters:**
 - `model_path` (str): Path to ONNX model file (ResNet-50 or MobileFace)
 
+**Class Attributes:**
+- `input_size`: (112, 112) - Required input image size
+- `normalization_mean`: 127.5 - Normalization mean value
+- `normalization_scale`: 127.5 - Normalization scale value
+
 ### Methods
 
 #### get_embedding
@@ -26,14 +31,19 @@ get_embedding(face_img: np.ndarray) -> np.ndarray
 Extracts a face embedding from an aligned face image.
 
 **Parameters:**
-- `face_img` (np.ndarray): Aligned face image (112x112 pixels)
+- `face_img` (np.ndarray): Face image, should be RGB format
 
 **Returns:**
 - np.ndarray: 512-dimensional face embedding
 
-#### get_similarity
+**Note:** The method handles:
+- Image resizing to 112x112
+- Normalization (subtract mean, divide by scale)
+- Color format conversion if needed
+
+#### compute_similarity
 ```python
-get_similarity(embedding1: np.ndarray, embedding2: np.ndarray) -> float
+compute_similarity(embedding1: np.ndarray, embedding2: np.ndarray) -> float
 ```
 
 Computes cosine similarity between two face embeddings.
@@ -51,20 +61,20 @@ Computes cosine similarity between two face embeddings.
 from models.arcface import ArcFace
 import cv2
 
-# Initialize model
-model = ArcFace("weights/w600k_r50.onnx")
+# Initialize model with CUDA support
+model = ArcFace("weights/w600k_r50.onnx")  # Will use CUDA if available
 
-# Load and preprocess face image
+# Prepare face image
 face_img = cv2.imread("face.jpg")
-face_img = cv2.resize(face_img, (112, 112))
+face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
 
 # Get face embedding
 embedding = model.get_embedding(face_img)
 
 # Compare with another face
-similarity = model.get_similarity(embedding, other_embedding)
-if similarity > 0.4:
-    print("Same person")
+similarity = model.compute_similarity(embedding, other_embedding)
+if similarity > 0.4:  # Default threshold
+    print(f"Same person, similarity: {similarity:.2f}")
 ```
 
 ## Model Variants
@@ -76,6 +86,7 @@ if similarity > 0.4:
   - High accuracy
   - 512-dimensional embeddings
   - Suitable for server deployments
+  - Good for high-security applications
 
 ### MobileFace Backbone
 - **File**: w600k_mbf.onnx
@@ -84,20 +95,27 @@ if similarity > 0.4:
   - Lightweight
   - 512-dimensional embeddings
   - Suitable for edge devices
+  - Good for real-time applications
 
-## Best Practices
+## Implementation Details
 
-1. **Image Preprocessing**
-   - Input images should be aligned using face landmarks
-   - Use 112x112 pixel size
-   - Convert to RGB format
+1. **Model Loading**
+   - Uses ONNX Runtime for inference
+   - Supports both CPU and CUDA execution providers
+   - Automatic provider selection based on availability
 
-2. **Similarity Thresholds**
-   - Default: 0.4
-   - Higher values (e.g., 0.6) for stricter matching
-   - Lower values for more lenient matching
+2. **Image Preprocessing**
+   - Automatic resizing to 112x112
+   - Normalization with mean=127.5, scale=127.5
+   - RGB color format handling
 
-3. **Performance Optimization**
-   - Batch processing when possible
-   - GPU acceleration with ONNX Runtime
-   - Proper error handling for invalid inputs
+3. **Error Handling**
+   - Input validation and shape checking
+   - Comprehensive logging for debugging
+   - Clear error messages for common issues
+
+4. **Best Practices**
+   - Use aligned face images (see utils.helpers.face_alignment)
+   - Keep consistent image preprocessing
+   - Validate similarity thresholds for your use case
+   - Consider model size vs accuracy tradeoffs

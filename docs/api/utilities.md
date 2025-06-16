@@ -11,148 +11,138 @@ def setup_logging(level=logging.INFO, log_to_file=False, filename="app.log") -> 
 
 Sets up the logging configuration for the application.
 
-#### Parameters
+**Parameters:**
 - `level` (int): Logging level (default: logging.INFO)
 - `log_to_file` (bool): Whether to log to a file (default: False)
 - `filename` (str): Log file name when log_to_file is True (default: "app.log")
 
-#### Example
-```python
-from utils.logging import setup_logging
-import logging
-
-# Setup console-only logging
-setup_logging(level=logging.DEBUG)
-
-# Setup both console and file logging
-setup_logging(level=logging.INFO, log_to_file=True, filename="face_reid.log")
+**Format:**
+```
+{timestamp} - {module_name} - {level} - {message}
 ```
 
-## Image Processing Functions (`utils/helpers.py`)
-
-### norm_crop_image
-```python
-def norm_crop_image(image, landmark, image_size=112, mode='arcface')
-```
-
-Normalizes and crops face images based on landmarks.
-
-#### Parameters
-- `image` (numpy.ndarray): Input image
-- `landmark` (numpy.ndarray): Face landmarks (5,2)
-- `image_size` (int): Output image size
-- `mode` (str): Alignment mode
-
-#### Returns
-- numpy.ndarray: Aligned and cropped face image
+## Face Alignment Functions (`utils/helpers.py`)
 
 ### estimate_norm
 ```python
-def estimate_norm(landmark, image_size=112)
+def estimate_norm(landmark: np.ndarray, image_size: int = 112) -> Tuple[np.ndarray, np.ndarray]
 ```
 
-Estimates normalization transformation matrix.
+Estimates the normalization transformation matrix for facial landmarks.
 
-#### Parameters
-- `landmark` (numpy.ndarray): Face landmarks
-- `image_size` (int): Target image size
+**Parameters:**
+- `landmark` (np.ndarray): Array of shape (5, 2) representing facial landmarks
+- `image_size` (int): Output image size, must be multiple of 112 or 128 (default: 112)
 
-#### Returns
-- tuple: (transformation_matrix, reference_index)
+**Returns:**
+- Tuple[np.ndarray, np.ndarray]: (transformation_matrix, inverse_transformation_matrix)
 
-## Geometry Functions
-
-### distance2bbox
+**Reference Landmarks:**
 ```python
-def distance2bbox(points, distance, max_shape=None)
+reference_alignment = np.array([
+    [38.2946, 51.6963],  # Left eye
+    [73.5318, 51.5014],  # Right eye
+    [56.0252, 71.7366],  # Nose tip
+    [41.5493, 92.3655],  # Left mouth corner
+    [70.7299, 92.2041]   # Right mouth corner
+], dtype=np.float32)
 ```
 
-Converts distance predictions to bounding boxes.
-
-#### Parameters
-- `points` (numpy.ndarray): Center points
-- `distance` (numpy.ndarray): Distance predictions
-- `max_shape` (tuple): Maximum shape constraints
-
-#### Returns
-- numpy.ndarray: Bounding boxes [x1, y1, x2, y2]
-
-### distance2kps
+### face_alignment
 ```python
-def distance2kps(points, distance, max_shape=None)
+def face_alignment(image: np.ndarray, landmark: np.ndarray, image_size: int = 112, mode: str = 'arcface') -> np.ndarray
 ```
 
-Converts distance predictions to keypoints.
+Aligns a face image using detected landmarks.
 
-#### Parameters
-- `points` (numpy.ndarray): Base points
-- `distance` (numpy.ndarray): Distance predictions
-- `max_shape` (tuple): Maximum shape constraints
+**Parameters:**
+- `image` (np.ndarray): Input image
+- `landmark` (np.ndarray): Face landmarks (5,2)
+- `image_size` (int): Output image size (default: 112)
+- `mode` (str): Alignment mode, 'arcface' supported
 
-#### Returns
-- numpy.ndarray: Keypoint coordinates
-
-## Visualization Functions
-
-### draw_bbox
-```python
-def draw_bbox(image, bbox, color=(0, 255, 0), thickness=3, proportion=0.2)
-```
-
-Draws detection bounding box with corner markers.
-
-#### Parameters
-- `image` (numpy.ndarray): Input image
-- `bbox` (list/array): Bounding box coordinates
-- `color` (tuple): RGB color
-- `thickness` (int): Line thickness
-- `proportion` (float): Corner size proportion
-
-#### Returns
-- numpy.ndarray: Image with drawn bounding box
-
-### draw_bbox_info
-```python
-def draw_bbox_info(frame, bbox, similarity, name, color)
-```
-
-Draws bounding box with identity and similarity information.
-
-#### Parameters
-- `frame` (numpy.ndarray): Input frame
-- `bbox` (list/array): Bounding box coordinates
-- `similarity` (float): Face similarity score
-- `name` (str): Identity name
-- `color` (tuple): RGB color
-
-## Similarity Computation
+**Returns:**
+- np.ndarray: Aligned face image
 
 ### compute_similarity
 ```python
-def compute_similarity(feat1: np.ndarray, feat2: np.ndarray) -> np.float32
+def compute_similarity(embedding1: np.ndarray, embedding2: np.ndarray) -> float
 ```
 
-Computes cosine similarity between face features.
+Computes cosine similarity between two embeddings.
 
-#### Parameters
-- `feat1` (numpy.ndarray): First face feature vector
-- `feat2` (numpy.ndarray): Second face feature vector
+**Parameters:**
+- `embedding1` (np.ndarray): First embedding vector
+- `embedding2` (np.ndarray): Second embedding vector
 
-#### Returns
-- float: Cosine similarity score
+**Returns:**
+- float: Similarity score (0-1 range)
 
-### Example Usage
+### Drawing Functions
 
+#### draw_bbox
 ```python
-# Face alignment
-aligned_face = norm_crop_image(image, landmarks)
+def draw_bbox(image: np.ndarray, bbox: np.ndarray, color: tuple = (0, 255, 0), thickness: int = 2) -> np.ndarray
+```
 
-# Bounding box visualization
-draw_bbox(frame, bbox, color=(0, 255, 0))
+Draws a bounding box on an image.
 
-# Add detection info
-draw_bbox_info(frame, bbox, 0.95, "Person", (0, 255, 0))
+**Parameters:**
+- `image` (np.ndarray): Input image
+- `bbox` (np.ndarray): Bounding box coordinates [x1, y1, x2, y2]
+- `color` (tuple): RGB color (default: green)
+- `thickness` (int): Line thickness (default: 2)
 
-# Compare faces
-similarity = compute_similarity(feat1, feat2)
+**Returns:**
+- np.ndarray: Image with drawn bounding box
+
+#### draw_bbox_info
+```python
+def draw_bbox_info(image: np.ndarray, bbox: np.ndarray, name: str, similarity: float) -> np.ndarray
+```
+
+Draws bounding box with identity information.
+
+**Parameters:**
+- `image` (np.ndarray): Input image
+- `bbox` (np.ndarray): Bounding box coordinates
+- `name` (str): Person's name
+- `similarity` (float): Similarity score
+
+**Returns:**
+- np.ndarray: Annotated image
+
+## Usage Examples
+
+### Logging Configuration
+```python
+from utils.logging import setup_logging
+
+# Console-only logging
+setup_logging(level=logging.DEBUG)
+
+# File and console logging
+setup_logging(level=logging.INFO, log_to_file=True, filename="face_reid.log")
+```
+
+### Face Alignment
+```python
+from utils.helpers import face_alignment, estimate_norm
+
+# Get transformation matrix
+matrix, inverse_matrix = estimate_norm(landmarks, image_size=112)
+
+# Align face image
+aligned_face = face_alignment(image, landmarks, image_size=112)
+```
+
+### Visualization
+```python
+from utils.helpers import draw_bbox, draw_bbox_info
+
+# Draw simple bounding box
+image = draw_bbox(image, bbox, color=(0, 255, 0))
+
+# Draw box with identity info
+image = draw_bbox_info(image, bbox, name="John", similarity=0.95)
 ```
