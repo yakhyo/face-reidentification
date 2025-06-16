@@ -20,13 +20,12 @@ class FaceDatabase:
         self.index_file = os.path.join(db_path, "faiss_index.bin")
         self.meta_file = os.path.join(db_path, "metadata.json")
 
-        # Create directory if it doesn't exist
         os.makedirs(db_path, exist_ok=True)
 
-        # Initialize FAISS index for L2 distance (can be converted to similarity)
-        self.index = faiss.IndexFlatIP(embedding_size)  # Inner product for cosine similarity
+        # Use inner product for cosine similarity search
+        self.index = faiss.IndexFlatIP(embedding_size)
 
-        # Metadata to store names corresponding to indices
+        # Stores associated names for each embedding
         self.metadata = []
 
     def add_face(self, embedding: np.ndarray, name: str) -> None:
@@ -37,7 +36,6 @@ class FaceDatabase:
             embedding: Face embedding vector
             name: Name of the person
         """
-        # Normalize for cosine similarity
         normalized_embedding = embedding / np.linalg.norm(embedding)
         self.index.add(np.array([normalized_embedding], dtype=np.float32))
         self.metadata.append(name)
@@ -56,13 +54,9 @@ class FaceDatabase:
         if self.index.ntotal == 0:
             return "Unknown", 0.0
 
-        # Normalize
         normalized_embedding = embedding / np.linalg.norm(embedding)
-
-        # Search
         similarities, indices = self.index.search(np.array([normalized_embedding], dtype=np.float32), 1)
 
-        # Get the best match
         best_similarity = similarities[0][0]
         best_idx = indices[0][0]
 
@@ -72,7 +66,9 @@ class FaceDatabase:
             return "Unknown", best_similarity
 
     def save(self) -> None:
-        """Save the database to disk"""
+        """
+        Save the FAISS index and metadata to disk.
+        """
         faiss.write_index(self.index, self.index_file)
         with open(self.meta_file, 'w', encoding='utf-8') as f:
             json.dump(self.metadata, f, ensure_ascii=False, indent=2)
@@ -80,14 +76,13 @@ class FaceDatabase:
 
     def load(self) -> bool:
         """
-        Load the database from disk.
+        Load the FAISS index and metadata from disk.
 
         Returns:
             bool: True if loaded successfully, False otherwise
         """
         if os.path.exists(self.index_file) and os.path.exists(self.meta_file):
             self.index = faiss.read_index(self.index_file)
-            # --- Load metadata from JSON ---
             with open(self.meta_file, 'r', encoding='utf-8') as f:
                 self.metadata = json.load(f)
             logging.info(f"Loaded face database with {self.index.ntotal} faces")
