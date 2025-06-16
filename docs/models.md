@@ -18,97 +18,80 @@ This document provides detailed information about the models used in the Face Re
 - **Size**: 3.14 MB
 - **Characteristics**:
   - Medium-sized model
-  - Better accuracy than 500M
-  - Still maintains good inference speed
-  - Recommended for general-purpose applications
+  - Better accuracy than 500M variant
+  - Suitable for desktop applications
+  - Good for general-purpose face detection
 
 ### SCRFD-10G
 - **File**: `det_10g.onnx`
 - **Size**: 16.1 MB
 - **Characteristics**:
-  - High-accuracy model
-  - More computational demands
-  - Best detection performance
-  - Recommended for accuracy-critical applications
+  - Large model with high accuracy
+  - Best for offline processing
+  - Suitable when accuracy is critical
+  - Can detect smaller and more challenging faces
 
 ## Face Recognition Models (ArcFace)
-
-### ArcFace MobileFace
-- **File**: `w600k_mbf.onnx`
-- **Size**: 12.99 MB
-- **Characteristics**:
-  - Lightweight backbone
-  - Efficient computation
-  - Suitable for mobile devices
-  - Good accuracy for most applications
 
 ### ArcFace ResNet-50
 - **File**: `w600k_r50.onnx`
 - **Size**: 166 MB
 - **Characteristics**:
+  - High-accuracy model
   - ResNet-50 backbone
-  - High accuracy
-  - More computational demands
-  - State-of-the-art recognition performance
+  - 512-dimensional face embeddings
+  - Recommended for applications requiring highest accuracy
+- **Features**:
+  - Integrated logging for better monitoring
+  - Improved error handling and validation
+  - Optimized face alignment process
+  - Support for FAISS-based similarity search
+
+### ArcFace MobileFace
+- **File**: `w600k_mbf.onnx`
+- **Size**: 12.99 MB
+- **Characteristics**:
+  - Lightweight model
+  - MobileFaceNet backbone
+  - 512-dimensional face embeddings
+  - Suitable for mobile and edge devices
+- **Features**:
+  - Efficient inference on CPU
+  - Optimized for real-time processing
+  - Good balance of speed and accuracy
+
+## Model Integration
+
+All models are integrated with:
+- Comprehensive logging system for monitoring and debugging
+- ONNX Runtime for efficient inference
+- Support for both CPU and GPU execution
+- Automated model weight management
+- Integration with FAISS for efficient similarity search
+
+## Performance Considerations
+
+### Face Detection
+- SCRFD-500M: ~15-20ms on CPU
+- SCRFD-2.5G: ~25-30ms on CPU
+- SCRFD-10G: ~40-50ms on CPU
+
+### Face Recognition
+- ResNet-50: ~25-30ms on CPU
+- MobileFace: ~10-15ms on CPU
+
+*Note: Performance metrics are approximate and may vary based on hardware configuration.*
 
 ## Model Selection Guide
 
-### Use Case Recommendations
-
-1. **Resource-Constrained Environments**
+1. **Resource-Constrained Environments** (Mobile/Edge):
    - Detection: SCRFD-500M
    - Recognition: ArcFace MobileFace
-   - Total Size: ~15.4 MB
 
-2. **Balanced Performance**
+2. **Balanced Performance** (Desktop):
    - Detection: SCRFD-2.5G
-   - Recognition: ArcFace MobileFace
-   - Total Size: ~16.13 MB
+   - Recognition: ArcFace MobileFace/ResNet-50
 
-3. **High Accuracy Requirements**
+3. **High Accuracy Requirements**:
    - Detection: SCRFD-10G
    - Recognition: ArcFace ResNet-50
-   - Total Size: ~182.1 MB
-
-### Performance Characteristics
-
-1. **Speed Priority**
-   ```
-   SCRFD-500M + MobileFace
-   - Fastest inference
-   - Lowest resource usage
-   - Suitable for real-time applications
-   ```
-
-2. **Balanced**
-   ```
-   SCRFD-2.5G + MobileFace
-   - Good accuracy
-   - Reasonable speed
-   - Moderate resource usage
-   ```
-
-3. **Accuracy Priority**
-   ```
-   SCRFD-10G + ResNet-50
-   - Highest accuracy
-   - Higher resource requirements
-   - Suitable for offline processing
-   ```
-
-## Model Training Information
-
-The models are trained on large-scale face datasets:
-
-- Detection models: Trained on WIDER FACE dataset
-- Recognition models: Trained on MS1M-v3 dataset
-
-## Model References
-
-1. SCRFD Paper:
-   - Title: "Sample and Computation Redistribution for Efficient Face Detection"
-   - URL: https://arxiv.org/abs/2105.04714
-
-2. ArcFace Paper:
-   - Title: "ArcFace: Additive Angular Margin Loss for Deep Face Recognition"
-   - URL: https://arxiv.org/abs/1801.07698

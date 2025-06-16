@@ -21,6 +21,13 @@ This guide will walk you through the process of setting up the Face Re-Identific
    pip install -r requirements.txt
    ```
 
+   Key dependencies include:
+   - ONNX and ONNX Runtime for model inference
+   - OpenCV for image processing
+   - NumPy for numerical operations
+   - scikit-image for image transformations
+   - FAISS for efficient similarity search
+
 3. **Download Model Weights**
 
    You have two options for downloading the model weights:
@@ -41,19 +48,32 @@ This guide will walk you through the process of setting up the Face Re-Identific
    | ArcFace MobileFace | w600k_mbf.onnx | 12.99 MB | Efficient face recognition |
    | ArcFace ResNet-50 | w600k_r50.onnx | 166 MB | High-accuracy face recognition |
 
+## Project Structure
+
+After installation, ensure you have the following directory structure:
+
+```
+face-reidentification/
+├── assets/
+│   ├── demo.mp4          # Sample video for testing
+│   └── faces/            # Sample face images
+├── database/             # Face database implementation
+├── models/               # Model implementations
+├── utils/               # Helper functions
+└── weights/             # Downloaded model weights
+```
+
 ## Verify Installation
 
-1. Create a `faces` directory and add some face images:
+1. Add sample faces to the database:
    ```bash
-   mkdir -p faces
-   # Add face images to the faces directory
+   # Copy face images to assets/faces/
+   python main.py --mode add --image assets/faces/person1.jpg --name "Person 1"
    ```
 
-2. Run a test inference:
+2. Run a test video:
    ```bash
-   python main.py --source 0  # For webcam
-   # OR
-   python main.py --source assets/demo.mp4  # For video file
+   python main.py --mode video --input assets/demo.mp4
    ```
 
 ## Troubleshooting

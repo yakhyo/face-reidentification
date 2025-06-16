@@ -1,8 +1,34 @@
 # Utilities API Reference
 
-This document describes the utility functions provided in the `utils/helpers.py` module.
+This document describes the utility functions provided in the `utils/` module.
 
-## Image Processing Functions
+## Logging Module (`utils/logging.py`)
+
+### setup_logging
+```python
+def setup_logging(level=logging.INFO, log_to_file=False, filename="app.log") -> None
+```
+
+Sets up the logging configuration for the application.
+
+#### Parameters
+- `level` (int): Logging level (default: logging.INFO)
+- `log_to_file` (bool): Whether to log to a file (default: False)
+- `filename` (str): Log file name when log_to_file is True (default: "app.log")
+
+#### Example
+```python
+from utils.logging import setup_logging
+import logging
+
+# Setup console-only logging
+setup_logging(level=logging.DEBUG)
+
+# Setup both console and file logging
+setup_logging(level=logging.INFO, log_to_file=True, filename="face_reid.log")
+```
+
+## Image Processing Functions (`utils/helpers.py`)
 
 ### norm_crop_image
 ```python

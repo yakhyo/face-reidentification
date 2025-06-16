@@ -14,11 +14,16 @@ Welcome to the API documentation for the Face Re-Identification project. This se
    - Feature extraction
    - Face comparison methods
 
-3. [Utilities](utilities.md)
+3. [Face Database](database.md)
+   - FAISS-based similarity search
+   - Face embedding storage
+   - Identity management
+
+4. [Utilities](utilities.md)
    - Image processing functions
    - Geometry calculations
    - Visualization tools
-   - Helper functions
+   - Logging utilities
 
 ## Quick Links
 
