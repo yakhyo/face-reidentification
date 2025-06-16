@@ -1,98 +1,103 @@
-# Face Recognition API Reference
+# Face Recognition (ArcFace) API Reference
 
-This document details the ArcFace implementation used for face recognition in the project.
+## Overview
+
+The Face Recognition module implements the ArcFace algorithm for face recognition and embedding generation. It provides high-accuracy face recognition capabilities with support for different model backbones.
 
 ## ArcFace Class
 
-### Overview
-
+### Initialization
 ```python
-from models import ArcFace
+ArcFace(model_path: str)
 ```
 
-The ArcFace class implements face recognition using the ArcFace model, based on the paper "ArcFace: Additive Angular Margin Loss for Deep Face Recognition".
+Creates a new ArcFace model instance.
 
-### Constructor
-
-```python
-def __init__(self, model_path: str = None, session=None) -> None
-```
-
-#### Parameters
-- `model_path` (str, optional): Path to the ONNX model file
-- `session` (onnxruntime.InferenceSession, optional): Existing ONNX session
+**Parameters:**
+- `model_path` (str): Path to ONNX model file (ResNet-50 or MobileFace)
 
 ### Methods
 
-#### get_feat
+#### get_embedding
 ```python
-def get_feat(self, images: np.ndarray) -> np.ndarray
+get_embedding(face_img: np.ndarray) -> np.ndarray
 ```
 
-Extracts face features from aligned face images.
+Extracts a face embedding from an aligned face image.
 
-##### Parameters
-- `images` (numpy.ndarray): Input face image(s)
+**Parameters:**
+- `face_img` (np.ndarray): Aligned face image (112x112 pixels)
 
-##### Returns
-- numpy.ndarray: Face embedding features
+**Returns:**
+- np.ndarray: 512-dimensional face embedding
 
-#### __call__
+#### get_similarity
 ```python
-def __call__(self, image, kps)
+get_similarity(embedding1: np.ndarray, embedding2: np.ndarray) -> float
 ```
 
-Main inference method for feature extraction.
+Computes cosine similarity between two face embeddings.
 
-##### Parameters
-- `image` (numpy.ndarray): Input image
-- `kps` (numpy.ndarray): Face keypoints for alignment
+**Parameters:**
+- `embedding1` (np.ndarray): First face embedding
+- `embedding2` (np.ndarray): Second face embedding
 
-##### Returns
-- numpy.ndarray: Face embedding vector
+**Returns:**
+- float: Similarity score between 0 and 1
 
-### Example Usage
+## Usage Example
 
 ```python
-# Initialize recognizer
-recognizer = ArcFace(model_path="weights/w600k_r50.onnx")
+from models.arcface import ArcFace
+import cv2
 
-# Process detected face
-image = cv2.imread("face.jpg")
-kps = ...  # Keypoints from SCRFD detector
-embedding = recognizer(image, kps)
+# Initialize model
+model = ArcFace("weights/w600k_r50.onnx")
 
-# Compare faces
-similarity = compute_similarity(embedding1, embedding2)
+# Load and preprocess face image
+face_img = cv2.imread("face.jpg")
+face_img = cv2.resize(face_img, (112, 112))
+
+# Get face embedding
+embedding = model.get_embedding(face_img)
+
+# Compare with another face
+similarity = model.get_similarity(embedding, other_embedding)
+if similarity > 0.4:
+    print("Same person")
 ```
 
-### Implementation Details
+## Model Variants
 
-1. **Input Processing**
-   - Normalization: mean=127.5, std=127.5
-   - Image alignment using keypoints
-   - RGB color order (swapRB=True)
+### ResNet-50 Backbone
+- **File**: w600k_r50.onnx
+- **Size**: 166 MB
+- **Features**:
+  - High accuracy
+  - 512-dimensional embeddings
+  - Suitable for server deployments
 
-2. **Model Variants**
-   - w600k_r50.onnx: ResNet-50 backbone (166 MB)
-   - w600k_mbf.onnx: MobileFace backbone (12.99 MB)
+### MobileFace Backbone
+- **File**: w600k_mbf.onnx
+- **Size**: 12.99 MB
+- **Features**:
+  - Lightweight
+  - 512-dimensional embeddings
+  - Suitable for edge devices
 
-3. **Feature Vector**
-   - High-dimensional face embedding
-   - Normalized for cosine similarity comparison
+## Best Practices
 
-### Best Practices
+1. **Image Preprocessing**
+   - Input images should be aligned using face landmarks
+   - Use 112x112 pixel size
+   - Convert to RGB format
 
-1. **Model Selection**
-   - Use ResNet-50 for highest accuracy
-   - Use MobileFace for resource-constrained environments
+2. **Similarity Thresholds**
+   - Default: 0.4
+   - Higher values (e.g., 0.6) for stricter matching
+   - Lower values for more lenient matching
 
-2. **Input Requirements**
-   - Properly aligned face images
-   - Consistent image size and format
-   - Good quality face images for enrollment
-
-3. **Similarity Computation**
-   - Use cosine similarity for comparison
-   - Typical threshold range: 0.3-0.5
-   - Adjust based on use case requirements
+3. **Performance Optimization**
+   - Batch processing when possible
+   - GPU acceleration with ONNX Runtime
+   - Proper error handling for invalid inputs
