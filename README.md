@@ -106,9 +106,9 @@ python main.py --source assets/in_video.mp4
 
 ```
 usage: main.py [-h] [--det-weight DET_WEIGHT] [--rec-weight REC_WEIGHT] [--similarity-thresh SIMILARITY_THRESH] [--confidence-thresh CONFIDENCE_THRESH]
-               [--faces-dir FACES_DIR] [--source SOURCE] [--max-num MAX_NUM]
+               [--faces-dir FACES_DIR] [--source SOURCE] [--max-num MAX_NUM] [--db-path DB_PATH] [--update-db] [--output OUTPUT]
 
-Face Detection-and-Recognition
+Face Detection-and-Recognition with FAISS
 
 options:
   -h, --help            show this help message and exit
@@ -124,9 +124,16 @@ options:
                         Path to faces stored dir
   --source SOURCE       Video file or video camera source. i.e 0 - webcam
   --max-num MAX_NUM     Maximum number of face detections from a frame
+  --db-path DB_PATH     Path to vector db and metadata
+  --update-db           Force update of the face database
+  --output OUTPUT       Output path for annotated video
 ```
 
 ## Reference
 
 1. https://github.com/deepinsight/insightface/tree/master/detection/scrfd
 2. https://github.com/deepinsight/insightface/tree/master/recognition/arcface_torch
+
+## Documentation
+
+- [Docs](docs/README.md)
