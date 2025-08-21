@@ -27,7 +27,8 @@ def parse_args():
     parser.add_argument("--faces-dir", type=str, default="./assets/faces", help="Path to faces stored dir")
     parser.add_argument("--source", type=str, default="./assets/in_video.mp4", help="Video file or webcam source")
     parser.add_argument("--max-num", type=int, default=0, help="Maximum number of face detections from a frame")
-    parser.add_argument("--db-path", type=str, default="./database/face_database", help="path to vector db and metadata")
+    parser.add_argument("--db-path", type=str, default="./database/face_database",
+                        help="path to vector db and metadata")
     parser.add_argument("--update-db", action="store_true", help="Force update of the face database")
     parser.add_argument("--output", type=str, default="output_video.mp4", help="Output path for annotated video")
 
@@ -35,7 +36,7 @@ def parse_args():
 
 
 def build_face_database(detector: SCRFD, recognizer: ArcFace, params: argparse.Namespace, force_update: bool = False) -> FaceDatabase:
-    face_db = FaceDatabase(db_path=params.db_path)
+    face_db = FaceDatabase(db_path=params.db_path, max_workers=4)
 
     if not force_update and face_db.load():
         logging.info("Loaded face database from disk.")
@@ -71,12 +72,25 @@ def build_face_database(detector: SCRFD, recognizer: ArcFace, params: argparse.N
 def frame_processor(frame: np.ndarray, detector: SCRFD, recognizer: ArcFace, face_db: FaceDatabase, colors: dict, params: argparse.Namespace) -> np.ndarray:
     bboxes, kpss = detector.detect(frame, params.max_num)
 
+    if len(bboxes) == 0:
+        return frame
+
+    # Process all faces in the frame in parallel
+    embeddings = []
+    processed_bboxes = []
+
+    # Get embeddings for all faces
     for bbox, kps in zip(bboxes, kpss):
         *bbox, conf_score = bbox.astype(np.int32)
         embedding = recognizer.get_embedding(frame, kps)
+        embeddings.append(embedding)
+        processed_bboxes.append(bbox)
 
-        name, similarity = face_db.search(embedding, params.similarity_thresh)
+    # Batch search for all faces
+    results = face_db.batch_search(embeddings, params.similarity_thresh)
 
+    # Draw results
+    for bbox, (name, similarity) in zip(processed_bboxes, results):
         if name != "Unknown":
             if name not in colors:
                 colors[name] = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
