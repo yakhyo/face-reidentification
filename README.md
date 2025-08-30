@@ -8,14 +8,23 @@
 <h5 align="center"> If you like our project, please give us a star ⭐ on GitHub for the latest updates.</h5>
 -->
 
-<video controls autoplay loop src="https://github.com/yakhyo/face-reidentification/assets/28424328/441880b0-1e43-4c28-9f63-b32bc9b6e6b4" muted="false" width="100%"></video>
+<video controls autoplay loop src="https://github.com/user-attachments/assets/16d63ac6-57a4-464b-8d82-948e1a06b6e3" muted="false" width="100%"></video>
 
 ## Key Features
 
-- **Real-Time Processing**: Supports both webcam and video file input for real-time face recognition
-- **High Accuracy**: Combines state-of-the-art models for reliable face detection and recognition
-- **FAISS Integration**: Fast and scalable similarity search using FAISS vector database
-- **Multiple Model Options**: Support for different model sizes to balance speed and accuracy
+- **Real-Time Face Recognition**: Live processing from webcam or video files with optimized performance
+- **Production-Ready Accuracy**: State-of-the-art SCRFD + ArcFace models for reliable detection and recognition
+- **Intelligent Processing**: Smart batch optimization that adapts to face count for optimal performance
+- **Scalable Vector Search**: FAISS-powered similarity search with thread-safe database operations
+- **Flexible Model Selection**: Multiple model sizes available to balance speed vs accuracy for your use case
+- **Robust Resource Management**: Built-in memory leak prevention and automatic cleanup for long-running applications
+
+## Performance Optimizations
+
+- **Intelligent Batch Processing**: Automatically switches between sequential and parallel processing based on face count
+- **Thread-Safe Database**: Robust FAISS integration with proper resource management
+- **Memory Efficient**: Context managers ensure proper cleanup and prevent memory leaks
+- **Optimized for Video**: Designed for typical video scenarios (1-5 faces per frame)
 
 > [!NOTE]
 > Place your target face images in the `assets/faces/` directory. The filenames will be used as identity labels during recognition.
@@ -55,7 +64,7 @@ The system combines three powerful components:
 └── requirements.txt  # Dependencies
 ```
 
-## Getting Started ⚡
+## Getting Started
 
 ### Prerequisites
 
@@ -118,13 +127,30 @@ usage: main.py [-h] [--det-weight DET_WEIGHT] [--rec-weight REC_WEIGHT]
 
 | Argument | Description | Default |
 |----------|-------------|---------|
-| --det-weight | Detection model path | weights/det_10g.onnx |
-| --rec-weight | Recognition model path | weights/w600k_r50.onnx |
-| --similarity-thresh | Face similarity threshold | 0.4 |
-| --confidence-thresh | Detection confidence threshold | 0.5 |
-| --faces-dir | Target faces directory | assets/faces |
-| --source | Video source (file or camera index) | 0 |
-| --max-num | Max faces per frame | 5 |
+| `--det-weight` | Detection model path | `weights/det_10g.onnx` |
+| `--rec-weight` | Recognition model path | `weights/w600k_r50.onnx` |
+| `--similarity-thresh` | Face similarity threshold | `0.4` |
+| `--confidence-thresh` | Detection confidence threshold | `0.5` |
+| `--faces-dir` | Target faces directory | `assets/faces` |
+| `--source` | Video source (file or camera index) | `0` |
+| `--max-num` | Max faces per frame | `5` |
+| `--db-path` | Custom database storage location | `./database/face_database` |
+| `--update-db` | Force rebuild face database | `False` |
+| `--output` | Specify output video path | `output_video.mp4` |
+
+## Technical Notes
+
+### Database Behavior
+- Face database automatically saves/loads from disk
+- Intelligent processing: sequential for <10 faces, parallel for larger batches
+- Thread-safe operations with proper resource cleanup
+
+### Performance Tips
+- **Typical video processing**: Sequential processing is automatically used for 1-5 faces per frame
+- **Threading optimization**: Parallel processing kicks in only for 10+ faces (rare in normal video)
+- **GPU acceleration**: Install `onnxruntime-gpu` for faster model inference
+- **Memory efficiency**: Context managers ensure proper resource cleanup in long-running applications
+- **Database persistence**: Face database automatically saves/loads, avoiding rebuild on restart
 
 ## References
 
