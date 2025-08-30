@@ -24,6 +24,7 @@ class FaceDatabase:
         self.index_file = os.path.join(db_path, "faiss_index.bin")
         self.meta_file = os.path.join(db_path, "metadata.json")
         self.max_workers = max_workers
+        self._shutdown = False
 
         os.makedirs(db_path, exist_ok=True)
 
@@ -36,8 +37,8 @@ class FaceDatabase:
         # Thread pool for parallel processing
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
 
-        # Lock for thread-safe operations
-        self.lock = threading.Lock()
+        # Use RLock instead of Lock to prevent potential deadlocks with nested locks
+        self.lock = threading.RLock()
 
         # Stores associated names for each embedding
         self.metadata = []
@@ -66,6 +67,19 @@ class FaceDatabase:
         Returns:
             Tuple containing the name and similarity score of the best match
         """
+        return self._search_internal(embedding, threshold)
+
+    def _search_internal(self, embedding: np.ndarray, threshold: float = 0.4) -> Tuple[str, float]:
+        """
+        Internal search method for thread-safe operations.
+
+        Args:
+            embedding: Query face embedding
+            threshold: Similarity threshold
+
+        Returns:
+            Tuple containing the name and similarity score of the best match
+        """
         if self.index.ntotal == 0:
             return "Unknown", 0.0
 
@@ -82,7 +96,8 @@ class FaceDatabase:
 
     def batch_search(self, embeddings: List[np.ndarray], threshold: float = 0.4) -> List[Tuple[str, float]]:
         """
-        Perform batch search for multiple face embeddings in parallel.
+        Perform batch search for multiple face embeddings with intelligent processing.
+        Uses sequential processing for small batches to avoid threading overhead.
 
         Args:
             embeddings: List of face embeddings to search for
@@ -91,16 +106,50 @@ class FaceDatabase:
         Returns:
             List of tuples containing names and similarity scores
         """
-        def search_worker(emb):
-            return self.search(emb, threshold)
+        if not embeddings:
+            return []
 
-        # Submit all searches to thread pool
-        futures = [self.executor.submit(search_worker, emb) for emb in embeddings]
+        # Use sequential processing for small batches to avoid threading overhead
+        if len(embeddings) < 10:
+            with self.lock:
+                results = []
+                for embedding in embeddings:
+                    result = self._search_internal(embedding, threshold)
+                    results.append(result)
+                return results
+        else:
+            return self.batch_search_parallel(embeddings, threshold)
 
-        # Gather results in order
-        results = []
-        for future in as_completed(futures):
-            results.append(future.result())
+    def batch_search_parallel(self, embeddings: List[np.ndarray], threshold: float = 0.4) -> List[Tuple[str, float]]:
+        """
+        Perform parallel batch search for multiple face embeddings.
+        Ensures results are returned in the same order as input embeddings.
+
+        Args:
+            embeddings: List of face embeddings to search for
+            threshold: Similarity threshold
+
+        Returns:
+            List of tuples containing names and similarity scores in input order
+        """
+        if self._shutdown:
+            # Fallback to sequential processing if executor is shutdown
+            return self.batch_search(embeddings, threshold)
+
+        # Submit all searches to thread pool with indices to maintain order
+        futures = []
+        for i, emb in enumerate(embeddings):
+            future = self.executor.submit(self._search_internal, emb, threshold)
+            futures.append((i, future))
+
+        # Gather results in the correct order
+        results = [None] * len(embeddings)
+        for i, future in futures:
+            try:
+                results[i] = future.result()
+            except Exception as e:
+                logging.error(f"Error in batch search for embedding {i}: {e}")
+                results[i] = ("Unknown", 0.0)
 
         return results
 
@@ -123,10 +172,14 @@ class FaceDatabase:
         Save the FAISS index and metadata to disk thread-safely.
         """
         with self.lock:
-            faiss.write_index(self.index, self.index_file)
-            with open(self.meta_file, 'w', encoding='utf-8') as f:
-                json.dump(self.metadata, f, ensure_ascii=False, indent=2)
-            logging.info(f"Face database saved with {self.index.ntotal} faces")
+            try:
+                faiss.write_index(self.index, self.index_file)
+                with open(self.meta_file, 'w', encoding='utf-8') as f:
+                    json.dump(self.metadata, f, ensure_ascii=False, indent=2)
+                logging.info(f"Face database saved with {self.index.ntotal} faces")
+            except Exception as e:
+                logging.error(f"Failed to save face database: {e}")
+                raise
 
     def load(self) -> bool:
         """
@@ -137,15 +190,50 @@ class FaceDatabase:
         """
         if os.path.exists(self.index_file) and os.path.exists(self.meta_file):
             with self.lock:
-                self.index = faiss.read_index(self.index_file)
-                with open(self.meta_file, 'r', encoding='utf-8') as f:
-                    self.metadata = json.load(f)
-                logging.info(f"Loaded face database with {self.index.ntotal} faces")
-            return True
+                try:
+                    self.index = faiss.read_index(self.index_file)
+                    with open(self.meta_file, 'r', encoding='utf-8') as f:
+                        self.metadata = json.load(f)
+                    logging.info(f"Loaded face database with {self.index.ntotal} faces")
+                    return True
+                except Exception as e:
+                    logging.error(f"Failed to load face database: {e}")
+                    return False
         return False
+
+    def _cleanup(self):
+        """
+        Clean up resources properly.
+        """
+        if not self._shutdown:
+            self._shutdown = True
+            if hasattr(self, 'executor'):
+                self.executor.shutdown(wait=True)
+
+    def close(self):
+        """
+        Explicitly close the database and clean up resources.
+        """
+        self._cleanup()
+
+    def __enter__(self):
+        """
+        Context manager entry.
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Context manager exit with proper resource cleanup.
+        """
+        self._cleanup()
 
     def __del__(self):
         """
         Clean up thread pool on deletion.
         """
-        self.executor.shutdown(wait=True)
+        try:
+            self._cleanup()
+        except:
+            # Ignore errors during cleanup in destructor
+            pass
