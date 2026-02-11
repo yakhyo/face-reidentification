@@ -3,7 +3,7 @@
 ![Downloads](https://img.shields.io/github/downloads/yakhyo/face-reidentification/total)
 [![GitHub Repo stars](https://img.shields.io/github/stars/yakhyo/face-reidentification)](https://github.com/yakhyo/face-reidentification/stargazers)
 [![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/yakhyo/face-reidentification)
-[![DeepWiki](https://img.shields.io/badge/DeepWiki-yakhyo%2Fface--reidentification-blue.svg?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACwAAAAyCAYAAAAnWDnqAAAAAXNSR0IArs4c6QAAA05JREFUaEPtmUtyEzEQhtWTQyQLHNak2AB7ZnyXZMEjXMGeK/AIi+QuHrMnbChYY7MIh8g01fJoopFb0uhhEqqcbWTp06/uv1saEDv4O3n3dV60RfP947Mm9/SQc0ICFQgzfc4CYZoTPAswgSJCCUJUnAAoRHOAUOcATwbmVLWdGoH//PB8mnKqScAhsD0kYP3j/Yt5LPQe2KvcXmGvRHcDnpxfL2zOYJ1mFwrryWTz0advv1Ut4CJgf5uhDuDj5eUcAUoahrdY/56ebRWeraTjMt/00Sh3UDtjgHtQNHwcRGOC98BJEAEymycmYcWwOprTgcB6VZ5JK5TAJ+fXGLBm3FDAmn6oPPjR4rKCAoJCal2eAiQp2x0vxTPB3ALO2CRkwmDy5WohzBDwSEFKRwPbknEggCPB/imwrycgxX2NzoMCHhPkDwqYMr9tRcP5qNrMZHkVnOjRMWwLCcr8ohBVb1OMjxLwGCvjTikrsBOiA6fNyCrm8V1rP93iVPpwaE+gO0SsWmPiXB+jikdf6SizrT5qKasx5j8ABbHpFTx+vFXp9EnYQmLx02h1QTTrl6eDqxLnGjporxl3NL3agEvXdT0WmEost648sQOYAeJS9Q7bfUVoMGnjo4AZdUMQku50McDcMWcBPvr0SzbTAFDfvJqwLzgxwATnCgnp4wDl6Aa+Ax283gghmj+vj7feE2KBBRMW3FzOpLOADl0Isb5587h/U4gGvkt5v60Z1VLG8BhYjbzRwyQZemwAd6cCR5/XFWLYZRIMpX39AR0tjaGGiGzLVyhse5C9RKC6ai42ppWPKiBagOvaYk8lO7DajerabOZP46Lby5wKjw1HCRx7p9sVMOWGzb/vA1hwiWc6jm3MvQDTogQkiqIhJV0nBQBTU+3okKCFDy9WwferkHjtxib7t3xIUQtHxnIwtx4mpg26/HfwVNVDb4oI9RHmx5WGelRVlrtiw43zboCLaxv46AZeB3IlTkwouebTr1y2NjSpHz68WNFjHvupy3q8TFn3Hos2IAk4Ju5dCo8B3wP7VPr/FGaKiG+T+v+TQqIrOqMTL1VdWV1DdmcbO8KXBz6esmYWYKPwDL5b5FA1a0hwapHiom0r/cKaoqr+27/XcrS5UwSMbQAAAABJRU5ErkJggg==)](https://deepwiki.com/yakhyo/face-reidentification)
+[![DeepWiki](https://img.shields.io/badge/DeepWiki-Docs-blue)](https://deepwiki.com/yakhyo/face-reidentification)
 
 
 
@@ -18,15 +18,15 @@
 - **Real-Time Face Recognition**: Live processing from webcam or video files with optimized performance
 - **Production-Ready Accuracy**: State-of-the-art SCRFD + ArcFace models for reliable detection and recognition
 - **Intelligent Processing**: Smart batch optimization that adapts to face count for optimal performance
-- **Scalable Vector Search**: FAISS-powered similarity search with thread-safe database operations
+- **Scalable Vector Search**: FAISS-powered similarity search with native batch operations
 - **Flexible Model Selection**: Multiple model sizes available to balance speed vs accuracy for your use case
-- **Robust Resource Management**: Built-in memory leak prevention and automatic cleanup for long-running applications
+- **Lightweight & Efficient**: Minimal dependencies with no threading overhead for maximum throughput
 
 ## Performance Optimizations
 
-- **Intelligent Batch Processing**: Automatically switches between sequential and parallel processing based on face count
-- **Thread-Safe Database**: Robust FAISS integration with proper resource management
-- **Memory Efficient**: Context managers ensure proper cleanup and prevent memory leaks
+- **Native Batch Processing**: All face queries are stacked and passed to FAISS in a single vectorised call
+- **Zero Threading Overhead**: CPU-bound FAISS operations run directly without GIL contention or lock overhead
+- **Memory Efficient**: Minimal allocations with numpy-vectorised normalisation
 - **Optimized for Video**: Designed for typical video scenarios (1-5 faces per frame)
 
 > [!NOTE]
@@ -131,7 +131,7 @@ usage: main.py [-h] [--det-weight DET_WEIGHT] [--rec-weight REC_WEIGHT]
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `--det-weight` | Detection model path | `weights/det_10g.onnx` |
-| `--rec-weight` | Recognition model path | `weights/w600k_r50.onnx` |
+| `--rec-weight` | Recognition model path | `weights/w600k_mbf.onnx` |
 | `--similarity-thresh` | Face similarity threshold | `0.4` |
 | `--confidence-thresh` | Detection confidence threshold | `0.5` |
 | `--faces-dir` | Target faces directory | `assets/faces` |
@@ -145,14 +145,12 @@ usage: main.py [-h] [--det-weight DET_WEIGHT] [--rec-weight REC_WEIGHT]
 
 ### Database Behavior
 - Face database automatically saves/loads from disk
-- Intelligent processing: sequential for <10 faces, parallel for larger batches
-- Thread-safe operations with proper resource cleanup
+- Batch queries are handled in a single FAISS call (no per-face loop)
+- Vectorised L2-normalisation via numpy for fast embedding preparation
 
 ### Performance Tips
-- **Typical video processing**: Sequential processing is automatically used for 1-5 faces per frame
-- **Threading optimization**: Parallel processing kicks in only for 10+ faces (rare in normal video)
+- **Batch FAISS search**: All detected faces are queried in a single `index.search()` call
 - **GPU acceleration**: Install `onnxruntime-gpu` for faster model inference
-- **Memory efficiency**: Context managers ensure proper resource cleanup in long-running applications
 - **Database persistence**: Face database automatically saves/loads, avoiding rebuild on restart
 
 ## References

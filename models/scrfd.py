@@ -1,5 +1,5 @@
-import os
 import cv2
+import logging
 import numpy as np
 import onnxruntime
 
@@ -7,6 +7,8 @@ from utils.helpers import distance2bbox, distance2kps
 from typing import Tuple
 
 __all__ = ["SCRFD"]
+
+logger = logging.getLogger(__name__)
 
 
 class SCRFD:
@@ -63,8 +65,9 @@ class SCRFD:
             # Get model info
             self.output_names = [x.name for x in self.session.get_outputs()]
             self.input_names = [x.name for x in self.session.get_inputs()]
+            logger.info(f"Successfully loaded SCRFD model from {model_path}")
         except Exception as e:
-            print(f"Failed to load the model: {e}")
+            logger.error(f"Failed to load the model: {e}")
             raise
 
     def forward(self, image, threshold):
@@ -208,22 +211,20 @@ class SCRFD:
 
 
 if __name__ == "__main__":
+    from utils.helpers import draw_bbox
+
     detector = SCRFD(model_path="./weights/det_10g.onnx")
     cap = cv2.VideoCapture(0)
 
     while True:
         ret, frame = cap.read()
-        if not cap.isOpened():
+        if not ret:
             break
 
-        boxes_list, points_list = detector.detect(frame)
+        bboxes, kpss = detector.detect(frame)
 
-        for boxes, points in zip(boxes_list, points_list):
-            x1, y1, x2, y2, score = boxes.astype(np.int32)
-            draw_corners(frame, boxes)
-
-            if points_list is not None:
-                draw_keypoints(frame, points)
+        for bbox in bboxes:
+            draw_bbox(frame, bbox[:4].astype(np.int32))
 
         cv2.imshow("FaceDetection", frame)
         if cv2.waitKey(1) & 0xFF == ord("q"):

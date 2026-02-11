@@ -10,7 +10,7 @@ import numpy as np
 from database import FaceDatabase
 from models import SCRFD, ArcFace
 from utils.logging import setup_logging
-from utils.helpers import compute_similarity, draw_bbox_info, draw_bbox
+from utils.helpers import draw_bbox_info, draw_bbox
 
 
 warnings.filterwarnings("ignore")
@@ -39,8 +39,13 @@ def parse_args():
     return parser.parse_args()
 
 
-def build_face_database(detector: SCRFD, recognizer: ArcFace, params: argparse.Namespace, force_update: bool = False) -> FaceDatabase:
-    face_db = FaceDatabase(db_path=params.db_path, max_workers=4)
+def build_face_database(
+    detector: SCRFD,
+    recognizer: ArcFace,
+    params: argparse.Namespace,
+    force_update: bool = False,
+) -> FaceDatabase:
+    face_db = FaceDatabase(db_path=params.db_path)
 
     if not force_update and face_db.load():
         logging.info("Loaded face database from disk.")
@@ -53,11 +58,14 @@ def build_face_database(detector: SCRFD, recognizer: ArcFace, params: argparse.N
         face_db.save()
         return face_db
 
-    for filename in os.listdir(params.faces_dir):
-        if not (filename.endswith('.jpg') or filename.endswith('.png')):
+    embeddings: list[np.ndarray] = []
+    names: list[str] = []
+
+    for filename in sorted(os.listdir(params.faces_dir)):
+        if not (filename.endswith(".jpg") or filename.endswith(".png")):
             continue
 
-        name = filename.rsplit('.', 1)[0]
+        name = filename.rsplit(".", 1)[0]
         image_path = os.path.join(params.faces_dir, filename)
         image = cv2.imread(image_path)
 
@@ -73,31 +81,41 @@ def build_face_database(detector: SCRFD, recognizer: ArcFace, params: argparse.N
                 continue
 
             embedding = recognizer.get_embedding(image, kpss[0])
-            face_db.add_face(embedding, name)
+            embeddings.append(embedding)
+            names.append(name)
             logging.info(f"Added face for: {name}")
         except Exception as e:
             logging.error(f"Error processing {image_path}: {e}")
             continue
 
+    if embeddings:
+        face_db.add_faces_batch(embeddings, names)
+
     face_db.save()
     return face_db
 
 
-def frame_processor(frame: np.ndarray, detector: SCRFD, recognizer: ArcFace, face_db: FaceDatabase, colors: dict, params: argparse.Namespace) -> np.ndarray:
+def frame_processor(
+    frame: np.ndarray,
+    detector: SCRFD,
+    recognizer: ArcFace,
+    face_db: FaceDatabase,
+    colors: dict,
+    params: argparse.Namespace,
+) -> np.ndarray:
     try:
         bboxes, kpss = detector.detect(frame, params.max_num)
 
         if len(bboxes) == 0:
             return frame
 
-        # Process all faces in the frame
-        embeddings = []
-        processed_bboxes = []
+        # Collect embeddings and bounding boxes for all detected faces.
+        embeddings: list[np.ndarray] = []
+        processed_bboxes: list[list[int]] = []
 
-        # Get embeddings for all faces
         for bbox, kps in zip(bboxes, kpss):
             try:
-                *bbox_coords, conf_score = bbox.astype(np.int32)
+                *bbox_coords, _ = bbox.astype(np.int32)
                 embedding = recognizer.get_embedding(frame, kps)
                 embeddings.append(embedding)
                 processed_bboxes.append(bbox_coords)
@@ -108,10 +126,10 @@ def frame_processor(frame: np.ndarray, detector: SCRFD, recognizer: ArcFace, fac
         if not embeddings:
             return frame
 
-        # Batch search for all faces - this now maintains proper ordering
+        # Single FAISS batch call for all faces in the frame.
         results = face_db.batch_search(embeddings, params.similarity_thresh)
 
-        # Draw results - results are now guaranteed to match the embedding order
+        # Draw results -- order is preserved by batch_search.
         for bbox, (name, similarity) in zip(processed_bboxes, results):
             if name != "Unknown":
                 if name not in colors:
@@ -134,50 +152,60 @@ def main(params):
         logging.error(f"Failed to load model weights: {e}")
         return
 
-    # Use context manager for proper resource cleanup
-    with build_face_database(detector, recognizer, params, force_update=params.update_db) as face_db:
-        colors = {}
+    face_db = build_face_database(detector, recognizer, params, force_update=params.update_db)
+    colors: dict[str, tuple[int, int, int]] = {}
 
-        try:
-            cap = cv2.VideoCapture(params.source if not isinstance(params.source, int) else int(params.source))
-            if not cap.isOpened():
-                raise IOError(f"Could not open video source: {params.source}")
+    try:
+        cap = cv2.VideoCapture(params.source if not isinstance(params.source, int) else int(params.source))
+        if not cap.isOpened():
+            raise IOError(f"Could not open video source: {params.source}")
 
-            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            out = cv2.VideoWriter(params.output, cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        out = cv2.VideoWriter(params.output, cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
 
-            frame_count = 0
-            while True:
-                ret, frame = cap.read()
-                if not ret:
-                    break
+        frame_count = 0
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
 
-                start = time.time()
-                frame = frame_processor(frame, detector, recognizer, face_db, colors, params)
-                end = time.time()
+            start = time.time()
+            frame = frame_processor(frame, detector, recognizer, face_db, colors, params)
+            elapsed = time.time() - start
 
-                out.write(frame)
+            # Draw FPS on the frame.
+            current_fps = 1.0 / elapsed if elapsed > 0 else 0.0
+            cv2.putText(
+                frame,
+                f"FPS: {current_fps:.1f}",
+                org=(10, 30),
+                fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                fontScale=1,
+                color=(0, 255, 0),
+                thickness=2,
+            )
 
-                cv2.imshow("Face Recognition", frame)
-                if cv2.waitKey(1) & 0xFF == ord("q"):
-                    break
+            out.write(frame)
 
-                frame_count += 1
-                logging.debug(f"Frame {frame_count}, FPS: {1 / (end - start):.2f}")
+            cv2.imshow("Face Recognition", frame)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
 
-            logging.info(f"Processed {frame_count} frames.")
+            frame_count += 1
+            logging.debug(f"Frame {frame_count}, FPS: {current_fps:.2f}")
 
-        except Exception as e:
-            logging.error(f"Error during video processing: {e}")
-        finally:
-            # Proper resource cleanup in finally block
-            if 'cap' in locals():
-                cap.release()
-            if 'out' in locals():
-                out.release()
-            cv2.destroyAllWindows()
+        logging.info(f"Processed {frame_count} frames.")
+
+    except Exception as e:
+        logging.error(f"Error during video processing: {e}")
+    finally:
+        if "cap" in locals():
+            cap.release()
+        if "out" in locals():
+            out.release()
+        cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
