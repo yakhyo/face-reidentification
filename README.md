@@ -1,11 +1,13 @@
 # Real-Time Face Re-Identification with FAISS, ArcFace & SCRFD
 
-![Downloads](https://img.shields.io/github/downloads/yakhyo/face-reidentification/total)
-[![GitHub Repo stars](https://img.shields.io/github/stars/yakhyo/face-reidentification)](https://github.com/yakhyo/face-reidentification/stargazers)
+[![Downloads](https://img.shields.io/github/downloads/yakhyo/face-reidentification/total?color=blue&label=Downloads)](https://github.com/yakhyo/face-reidentification/releases)
+[![GitHub Repo Stars](https://img.shields.io/github/stars/yakhyo/face-reidentification)](https://github.com/yakhyo/face-reidentification/stargazers)
 [![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/yakhyo/face-reidentification)
-[![DeepWiki](https://img.shields.io/badge/DeepWiki-yakhyo%2Fface--reidentification-blue.svg?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACwAAAAyCAYAAAAnWDnqAAAAAXNSR0IArs4c6QAAA05JREFUaEPtmUtyEzEQhtWTQyQLHNak2AB7ZnyXZMEjXMGeK/AIi+QuHrMnbChYY7MIh8g01fJoopFb0uhhEqqcbWTp06/uv1saEDv4O3n3dV60RfP947Mm9/SQc0ICFQgzfc4CYZoTPAswgSJCCUJUnAAoRHOAUOcATwbmVLWdGoH//PB8mnKqScAhsD0kYP3j/Yt5LPQe2KvcXmGvRHcDnpxfL2zOYJ1mFwrryWTz0advv1Ut4CJgf5uhDuDj5eUcAUoahrdY/56ebRWeraTjMt/00Sh3UDtjgHtQNHwcRGOC98BJEAEymycmYcWwOprTgcB6VZ5JK5TAJ+fXGLBm3FDAmn6oPPjR4rKCAoJCal2eAiQp2x0vxTPB3ALO2CRkwmDy5WohzBDwSEFKRwPbknEggCPB/imwrycgxX2NzoMCHhPkDwqYMr9tRcP5qNrMZHkVnOjRMWwLCcr8ohBVb1OMjxLwGCvjTikrsBOiA6fNyCrm8V1rP93iVPpwaE+gO0SsWmPiXB+jikdf6SizrT5qKasx5j8ABbHpFTx+vFXp9EnYQmLx02h1QTTrl6eDqxLnGjporxl3NL3agEvXdT0WmEost648sQOYAeJS9Q7bfUVoMGnjo4AZdUMQku50McDcMWcBPvr0SzbTAFDfvJqwLzgxwATnCgnp4wDl6Aa+Ax283gghmj+vj7feE2KBBRMW3FzOpLOADl0Isb5587h/U4gGvkt5v60Z1VLG8BhYjbzRwyQZemwAd6cCR5/XFWLYZRIMpX39AR0tjaGGiGzLVyhse5C9RKC6ai42ppWPKiBagOvaYk8lO7DajerabOZP46Lby5wKjw1HCRx7p9sVMOWGzb/vA1hwiWc6jm3MvQDTogQkiqIhJV0nBQBTU+3okKCFDy9WwferkHjtxib7t3xIUQtHxnIwtx4mpg26/HfwVNVDb4oI9RHmx5WGelRVlrtiw43zboCLaxv46AZeB3IlTkwouebTr1y2NjSpHz68WNFjHvupy3q8TFn3Hos2IAk4Ju5dCo8B3wP7VPr/FGaKiG+T+v+TQqIrOqMTL1VdWV1DdmcbO8KXBz6esmYWYKPwDL5b5FA1a0hwapHiom0r/cKaoqr+27/XcrS5UwSMbQAAAABJRU5ErkJggg==)](https://deepwiki.com/yakhyo/face-reidentification)
+[![DeepWiki](https://img.shields.io/badge/DeepWiki-Docs-blue)](https://deepwiki.com/yakhyo/face-reidentification)
 
-
+> [!TIP]
+> The models and functionality in this repository are **integrated into [UniFace](https://github.com/yakhyo/uniface)** — an all-in-one face analysis library.<br>
+> [![PyPI Version](https://img.shields.io/pypi/v/uniface.svg)](https://pypi.org/project/uniface/) [![GitHub Stars](https://img.shields.io/github/stars/yakhyo/uniface)](https://github.com/yakhyo/uniface/stargazers) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 <!--
 <h5 align="center"> If you like our project, please give us a star ⭐ on GitHub for the latest updates.</h5>
@@ -15,29 +17,19 @@
 
 ## Key Features
 
-- **Real-Time Face Recognition**: Live processing from webcam or video files with optimized performance
-- **Production-Ready Accuracy**: State-of-the-art SCRFD + ArcFace models for reliable detection and recognition
-- **Intelligent Processing**: Smart batch optimization that adapts to face count for optimal performance
-- **Scalable Vector Search**: FAISS-powered similarity search with thread-safe database operations
-- **Flexible Model Selection**: Multiple model sizes available to balance speed vs accuracy for your use case
-- **Robust Resource Management**: Built-in memory leak prevention and automatic cleanup for long-running applications
-
-## Performance Optimizations
-
-- **Intelligent Batch Processing**: Automatically switches between sequential and parallel processing based on face count
-- **Thread-Safe Database**: Robust FAISS integration with proper resource management
-- **Memory Efficient**: Context managers ensure proper cleanup and prevent memory leaks
-- **Optimized for Video**: Designed for typical video scenarios (1-5 faces per frame)
+- **Real-Time Face Recognition**: Process webcam or video files with SCRFD detection and ArcFace embeddings
+- **FAISS Similarity Search**: Batch cosine-similarity lookup using a FAISS inner-product index
+- **Multiple Model Sizes**: Choose from lightweight to high-accuracy detection and recognition models
+- **Minimal Dependencies**: Built on ONNX Runtime, OpenCV, NumPy, and FAISS with no extra frameworks
 
 > [!NOTE]
 > Place your target face images in the `assets/faces/` directory. The filenames will be used as identity labels during recognition.
 
-## Architecture
+## Components
 
-The system combines three powerful components:
-1. **SCRFD** ([Paper](https://arxiv.org/abs/2105.04714)): Efficient face detection
-2. **ArcFace** ([Paper](https://arxiv.org/abs/1801.07698)): Robust face recognition
-3. **FAISS**: Fast similarity search for face re-identification
+1. **SCRFD** — Sample and Computation Redistribution for Efficient Face Detection
+2. **ArcFace** — Additive Angular Margin Loss for Deep Face Recognition
+3. **FAISS** — Facebook AI Similarity Search
 
 ### Available Models
 
@@ -54,17 +46,17 @@ The system combines three powerful components:
 ```
 ├── assets/
 │   ├── demo.mp4
-│   |── in_video.mp4
-|   └── faces/           # Place target face images here
-│     ├── face1.jpg
-│     ├── face2.jpg
-│     └── ...
-├── database/           # FAISS database implementation
-├── models/            # Neural network models
-├── weights/           # Model weights (download required)
-├── utils/            # Helper functions
-├── main.py           # Main application entry
-└── requirements.txt  # Dependencies
+│   ├── in_video.mp4
+│   └── faces/              # Place target face images here
+│       ├── face1.jpg
+│       ├── face2.jpg
+│       └── ...
+├── database/               # FAISS database implementation
+├── models/                 # Neural network models
+├── weights/                # Model weights (download required)
+├── utils/                  # Helper functions
+├── main.py                 # Main application entry
+└── requirements.txt        # Dependencies
 ```
 
 ## Getting Started
@@ -72,13 +64,13 @@ The system combines three powerful components:
 ### Prerequisites
 
 > [!IMPORTANT]
-> Make sure you have Python 3.7+ installed on your system.
+> Make sure you have Python 3.10+ installed on your system.
 
 ### Installation
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/yakyo/face-reidentification.git
+git clone https://github.com/yakhyo/face-reidentification.git
 cd face-reidentification
 ```
 
@@ -123,37 +115,29 @@ python main.py --source assets/in_video.mp4
 > Use these arguments to customize the recognition behavior:
 
 ```bash
-usage: main.py [-h] [--det-weight DET_WEIGHT] [--rec-weight REC_WEIGHT] 
+usage: main.py [-h] [--det-weight DET_WEIGHT] [--rec-weight REC_WEIGHT]
                [--similarity-thresh SIMILARITY_THRESH] [--confidence-thresh CONFIDENCE_THRESH]
                [--faces-dir FACES_DIR] [--source SOURCE] [--max-num MAX_NUM]
 ```
 
 | Argument | Description | Default |
 |----------|-------------|---------|
-| `--det-weight` | Detection model path | `weights/det_10g.onnx` |
-| `--rec-weight` | Recognition model path | `weights/w600k_r50.onnx` |
+| `--det-weight` | Detection model path | `./weights/det_10g.onnx` |
+| `--rec-weight` | Recognition model path | `./weights/w600k_mbf.onnx` |
 | `--similarity-thresh` | Face similarity threshold | `0.4` |
 | `--confidence-thresh` | Detection confidence threshold | `0.5` |
-| `--faces-dir` | Target faces directory | `assets/faces` |
-| `--source` | Video source (file or camera index) | `0` |
-| `--max-num` | Max faces per frame | `5` |
+| `--faces-dir` | Target faces directory | `./assets/faces` |
+| `--source` | Video source (file or camera index) | `./assets/in_video.mp4` |
+| `--max-num` | Max faces per frame (0 = unlimited) | `0` |
 | `--db-path` | Custom database storage location | `./database/face_database` |
 | `--update-db` | Force rebuild face database | `False` |
 | `--output` | Specify output video path | `output_video.mp4` |
 
 ## Technical Notes
 
-### Database Behavior
-- Face database automatically saves/loads from disk
-- Intelligent processing: sequential for <10 faces, parallel for larger batches
-- Thread-safe operations with proper resource cleanup
-
-### Performance Tips
-- **Typical video processing**: Sequential processing is automatically used for 1-5 faces per frame
-- **Threading optimization**: Parallel processing kicks in only for 10+ faces (rare in normal video)
-- **GPU acceleration**: Install `onnxruntime-gpu` for faster model inference
-- **Memory efficiency**: Context managers ensure proper resource cleanup in long-running applications
-- **Database persistence**: Face database automatically saves/loads, avoiding rebuild on restart
+- Face database is saved to and loaded from disk automatically; no rebuild needed on restart
+- All detected faces in a frame are queried in a single FAISS `index.search()` call
+- For GPU-accelerated inference, install `onnxruntime-gpu` instead of `onnxruntime`
 
 ## References
 

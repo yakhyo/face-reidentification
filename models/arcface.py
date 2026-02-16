@@ -1,6 +1,7 @@
+from logging import getLogger
+
 import cv2
 import numpy as np
-from logging import getLogger
 from onnxruntime import InferenceSession
 
 from utils.helpers import face_alignment
@@ -55,7 +56,10 @@ class ArcFace:
             self.output_shape = self.session.get_outputs()[0].shape
             self.embedding_size = self.output_shape[1]
 
-            assert len(self.output_names) == 1, "Expected only one output node."
+            if len(self.output_names) != 1:
+                raise ValueError(
+                    f"Expected exactly one output node, got {len(self.output_names)}."
+                )
             logger.info(
                 f"Successfully initialized face encoder from {self.model_path} "
                 f"(embedding size: {self.embedding_size})"

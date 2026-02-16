@@ -1,12 +1,15 @@
-import os
+import logging
+from typing import Tuple
+
 import cv2
 import numpy as np
 import onnxruntime
 
 from utils.helpers import distance2bbox, distance2kps
-from typing import Tuple
 
 __all__ = ["SCRFD"]
+
+logger = logging.getLogger(__name__)
 
 
 class SCRFD:
@@ -18,17 +21,17 @@ class SCRFD:
     def __init__(
         self,
         model_path: str,
-        input_size: Tuple[int] = (640, 640),
+        input_size: Tuple[int, int] = (640, 640),
         conf_thres: float = 0.5,
-        iou_thres: float = 0.4
+        iou_thres: float = 0.4,
     ) -> None:
         """SCRFD initialization
 
         Args:
-            model_path (str): Path model .onnx file.
-            input_size (int): Input image size. Defaults to (640, 640)
+            model_path (str): Path to .onnx model file.
+            input_size (Tuple[int, int]): Input image size as (width, height). Defaults to (640, 640).
             conf_thres (float, optional): Confidence threshold. Defaults to 0.5.
-            iou_thres (float, optional): Non-max supression (NMS) threshold. Defaults to 0.4.
+            iou_thres (float, optional): Non-max suppression (NMS) threshold. Defaults to 0.4.
         """
 
         self.input_size = input_size
@@ -49,8 +52,8 @@ class SCRFD:
 
         self._initialize_model(model_path=model_path)
 
-    def _initialize_model(self, model_path: str):
-        """Initialize the model from the given path.
+    def _initialize_model(self, model_path: str) -> None:
+        """Initialize the ONNX inference session.
 
         Args:
             model_path (str): Path to .onnx model.
@@ -63,11 +66,23 @@ class SCRFD:
             # Get model info
             self.output_names = [x.name for x in self.session.get_outputs()]
             self.input_names = [x.name for x in self.session.get_inputs()]
+            logger.info(f"Successfully loaded SCRFD model from {model_path}")
         except Exception as e:
-            print(f"Failed to load the model: {e}")
+            logger.error(f"Failed to load the model: {e}")
             raise
 
-    def forward(self, image, threshold):
+    def forward(
+        self, image: np.ndarray, threshold: float
+    ) -> Tuple[list[np.ndarray], list[np.ndarray], list[np.ndarray]]:
+        """Run a single forward pass through the detection model.
+
+        Args:
+            image: Preprocessed input image (already resized / padded).
+            threshold: Score threshold for filtering detections.
+
+        Returns:
+            Tuple of (scores_list, bboxes_list, kpss_list) per FPN stride.
+        """
         scores_list = []
         bboxes_list = []
         kpss_list = []
@@ -119,7 +134,20 @@ class SCRFD:
                 kpss_list.append(pos_kpss)
         return scores_list, bboxes_list, kpss_list
 
-    def detect(self, image, max_num=0, metric="max"):
+    def detect(
+        self, image: np.ndarray, max_num: int = 0, metric: str = "max"
+    ) -> Tuple[np.ndarray, np.ndarray | None]:
+        """Detect faces in an image.
+
+        Args:
+            image: Input BGR image.
+            max_num: Maximum detections to return (0 = unlimited).
+            metric: Selection metric when capping detections ("max" for area, otherwise area-offset).
+
+        Returns:
+            Tuple of (detections, keypoints) where detections has shape (N, 5)
+            with columns [x1, y1, x2, y2, score] and keypoints has shape (N, 5, 2).
+        """
         width, height = self.input_size
 
         im_ratio = float(image.shape[0]) / image.shape[1]
@@ -177,7 +205,16 @@ class SCRFD:
                 kpss = kpss[bindex, :]
         return det, kpss
 
-    def nms(self, dets, iou_thres):
+    def nms(self, dets: np.ndarray, iou_thres: float) -> list[int]:
+        """Greedy non-maximum suppression.
+
+        Args:
+            dets: Detections array of shape (N, 5) with columns [x1, y1, x2, y2, score].
+            iou_thres: IoU threshold above which overlapping boxes are suppressed.
+
+        Returns:
+            List of kept detection indices.
+        """
         x1 = dets[:, 0]
         y1 = dets[:, 1]
         x2 = dets[:, 2]
@@ -208,26 +245,25 @@ class SCRFD:
 
 
 if __name__ == "__main__":
+    from utils.helpers import draw_bbox
+
     detector = SCRFD(model_path="./weights/det_10g.onnx")
     cap = cv2.VideoCapture(0)
 
-    while True:
-        ret, frame = cap.read()
-        if not cap.isOpened():
-            break
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
 
-        boxes_list, points_list = detector.detect(frame)
+            bboxes, kpss = detector.detect(frame)
 
-        for boxes, points in zip(boxes_list, points_list):
-            x1, y1, x2, y2, score = boxes.astype(np.int32)
-            draw_corners(frame, boxes)
+            for bbox in bboxes:
+                draw_bbox(frame, bbox[:4].astype(np.int32))
 
-            if points_list is not None:
-                draw_keypoints(frame, points)
-
-        cv2.imshow("FaceDetection", frame)
-        if cv2.waitKey(1) & 0xFF == ord("q"):
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()
+            cv2.imshow("FaceDetection", frame)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
