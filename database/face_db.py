@@ -1,11 +1,12 @@
-import os
 import json
 import logging
+import os
+from typing import Tuple
 
 import faiss
 import numpy as np
 
-from typing import Tuple, List
+logger = logging.getLogger(__name__)
 
 
 class FaceDatabase:
@@ -34,7 +35,7 @@ class FaceDatabase:
         self.index = faiss.IndexFlatIP(embedding_size)
 
         # Parallel list of names; metadata[i] corresponds to index row i.
-        self.metadata: List[str] = []
+        self.metadata: list[str] = []
 
 
     def add_face(self, embedding: np.ndarray, name: str) -> None:
@@ -72,7 +73,7 @@ class FaceDatabase:
         return "Unknown", similarity
 
 
-    def add_faces_batch(self, embeddings: List[np.ndarray], names: List[str]) -> None:
+    def add_faces_batch(self, embeddings: list[np.ndarray], names: list[str]) -> None:
         """Add multiple face embeddings at once (vectorised).
 
         Args:
@@ -90,9 +91,9 @@ class FaceDatabase:
 
     def batch_search(
         self,
-        embeddings: List[np.ndarray],
+        embeddings: list[np.ndarray],
         threshold: float = 0.4,
-    ) -> List[Tuple[str, float]]:
+    ) -> list[Tuple[str, float]]:
         """Search closest identities for multiple embeddings in a single FAISS call.
 
         Args:
@@ -117,7 +118,7 @@ class FaceDatabase:
         # Single FAISS call for the entire batch.
         similarities, indices = self.index.search(mat, 1)
 
-        results: List[Tuple[str, float]] = []
+        results: list[Tuple[str, float]] = []
         for sim_row, idx_row in zip(similarities, indices):
             similarity = float(sim_row[0])
             idx = int(idx_row[0])
@@ -135,9 +136,9 @@ class FaceDatabase:
             faiss.write_index(self.index, self.index_file)
             with open(self.meta_file, "w", encoding="utf-8") as f:
                 json.dump(self.metadata, f, ensure_ascii=False, indent=2)
-            logging.info(f"Face database saved with {self.index.ntotal} faces")
+            logger.info(f"Face database saved with {self.index.ntotal} faces")
         except Exception as e:
-            logging.error(f"Failed to save face database: {e}")
+            logger.error(f"Failed to save face database: {e}")
             raise
 
     def load(self) -> bool:
@@ -149,13 +150,18 @@ class FaceDatabase:
         if not (os.path.exists(self.index_file) and os.path.exists(self.meta_file)):
             return False
         try:
-            self.index = faiss.read_index(self.index_file)
+            # Load into temporaries first to avoid inconsistent state on partial failure.
+            loaded_index = faiss.read_index(self.index_file)
             with open(self.meta_file, "r", encoding="utf-8") as f:
-                self.metadata = json.load(f)
-            logging.info(f"Loaded face database with {self.index.ntotal} faces")
+                loaded_metadata: list[str] = json.load(f)
+
+            # Assign only after both succeeded.
+            self.index = loaded_index
+            self.metadata = loaded_metadata
+            logger.info(f"Loaded face database with {self.index.ntotal} faces")
             return True
         except Exception as e:
-            logging.error(f"Failed to load face database: {e}")
+            logger.error(f"Failed to load face database: {e}")
             return False
 
 

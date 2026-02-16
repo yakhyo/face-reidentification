@@ -1,23 +1,28 @@
+import argparse
+import logging
 import os
-import cv2
 import random
 import time
 import warnings
-import argparse
-import logging
+
+import cv2
 import numpy as np
 
 from database import FaceDatabase
 from models import SCRFD, ArcFace
+from utils.helpers import draw_bbox, draw_bbox_info
 from utils.logging import setup_logging
-from utils.helpers import draw_bbox_info, draw_bbox
 
+# Suppress only known noisy warnings from third-party libraries.
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"onnxruntime.*")
 
-warnings.filterwarnings("ignore")
 setup_logging(log_to_file=True)
+logger = logging.getLogger(__name__)
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for face re-identification pipeline."""
     parser = argparse.ArgumentParser(description="Face Detection-and-Recognition with FAISS")
 
     parser.add_argument("--det-weight", type=str, default="./weights/det_10g.onnx", help="Path to detection model")
@@ -31,7 +36,7 @@ def parse_args():
         "--db-path",
         type=str,
         default="./database/face_database",
-        help="path to vector db and metadata"
+        help="path to vector db and metadata",
     )
     parser.add_argument("--update-db", action="store_true", help="Force update of the face database")
     parser.add_argument("--output", type=str, default="output_video.mp4", help="Output path for annotated video")
@@ -45,16 +50,27 @@ def build_face_database(
     params: argparse.Namespace,
     force_update: bool = False,
 ) -> FaceDatabase:
-    face_db = FaceDatabase(db_path=params.db_path)
+    """Build or load the FAISS face database from reference images.
+
+    Args:
+        detector: Face detection model.
+        recognizer: Face recognition model (provides embedding_size).
+        params: CLI arguments namespace.
+        force_update: If True, rebuild even when a saved database exists.
+
+    Returns:
+        Populated FaceDatabase instance.
+    """
+    face_db = FaceDatabase(embedding_size=recognizer.embedding_size, db_path=params.db_path)
 
     if not force_update and face_db.load():
-        logging.info("Loaded face database from disk.")
+        logger.info("Loaded face database from disk.")
         return face_db
 
-    logging.info("Building face database from images...")
+    logger.info("Building face database from images...")
 
     if not os.path.exists(params.faces_dir):
-        logging.warning(f"Faces directory {params.faces_dir} does not exist. Creating empty database.")
+        logger.warning(f"Faces directory {params.faces_dir} does not exist. Creating empty database.")
         face_db.save()
         return face_db
 
@@ -70,22 +86,22 @@ def build_face_database(
         image = cv2.imread(image_path)
 
         if image is None:
-            logging.warning(f"Could not read image: {image_path}")
+            logger.warning(f"Could not read image: {image_path}")
             continue
 
         try:
             bboxes, kpss = detector.detect(image, max_num=1)
 
             if len(kpss) == 0:
-                logging.warning(f"No face detected in {image_path}. Skipping...")
+                logger.warning(f"No face detected in {image_path}. Skipping...")
                 continue
 
             embedding = recognizer.get_embedding(image, kpss[0])
             embeddings.append(embedding)
             names.append(name)
-            logging.info(f"Added face for: {name}")
+            logger.info(f"Added face for: {name}")
         except Exception as e:
-            logging.error(f"Error processing {image_path}: {e}")
+            logger.error(f"Error processing {image_path}: {e}")
             continue
 
     if embeddings:
@@ -100,9 +116,22 @@ def frame_processor(
     detector: SCRFD,
     recognizer: ArcFace,
     face_db: FaceDatabase,
-    colors: dict,
+    colors: dict[str, tuple[int, int, int]],
     params: argparse.Namespace,
 ) -> np.ndarray:
+    """Detect faces, extract embeddings, search the database, and annotate the frame.
+
+    Args:
+        frame: Input BGR video frame.
+        detector: Face detection model.
+        recognizer: Face recognition model.
+        face_db: FAISS face database to query.
+        colors: Mutable colour map — new identities are assigned a random colour.
+        params: CLI arguments namespace.
+
+    Returns:
+        Annotated frame with bounding boxes and identity labels.
+    """
     try:
         bboxes, kpss = detector.detect(frame, params.max_num)
 
@@ -120,7 +149,7 @@ def frame_processor(
                 embeddings.append(embedding)
                 processed_bboxes.append(bbox_coords)
             except Exception as e:
-                logging.warning(f"Error processing face embedding: {e}")
+                logger.warning(f"Error processing face embedding: {e}")
                 continue
 
         if not embeddings:
@@ -129,7 +158,7 @@ def frame_processor(
         # Single FAISS batch call for all faces in the frame.
         results = face_db.batch_search(embeddings, params.similarity_thresh)
 
-        # Draw results -- order is preserved by batch_search.
+        # Draw results — order is preserved by batch_search.
         for bbox, (name, similarity) in zip(processed_bboxes, results):
             if name != "Unknown":
                 if name not in colors:
@@ -139,24 +168,43 @@ def frame_processor(
                 draw_bbox(frame, bbox, (255, 0, 0))
 
     except Exception as e:
-        logging.error(f"Error in frame processing: {e}")
+        logger.error(f"Error in frame processing: {e}")
 
     return frame
 
 
-def main(params):
+def _resolve_source(source: str) -> int | str:
+    """Convert source string to an integer webcam index when appropriate.
+
+    A pure-digit string (e.g. "0", "1") is treated as a webcam index.
+    All other strings are returned as-is (file paths, URLs, etc.).
+    """
+    if source.isdigit():
+        return int(source)
+    return source
+
+
+def main(params: argparse.Namespace) -> None:
+    """Run the face re-identification video pipeline.
+
+    Args:
+        params: Parsed CLI arguments.
+    """
     try:
         detector = SCRFD(params.det_weight, input_size=(640, 640), conf_thres=params.confidence_thresh)
         recognizer = ArcFace(params.rec_weight)
     except Exception as e:
-        logging.error(f"Failed to load model weights: {e}")
+        logger.error(f"Failed to load model weights: {e}")
         return
 
     face_db = build_face_database(detector, recognizer, params, force_update=params.update_db)
     colors: dict[str, tuple[int, int, int]] = {}
 
+    cap: cv2.VideoCapture | None = None
+    out: cv2.VideoWriter | None = None
     try:
-        cap = cv2.VideoCapture(params.source if not isinstance(params.source, int) else int(params.source))
+        source = _resolve_source(params.source)
+        cap = cv2.VideoCapture(source)
         if not cap.isOpened():
             raise IOError(f"Could not open video source: {params.source}")
 
@@ -194,24 +242,19 @@ def main(params):
                 break
 
             frame_count += 1
-            logging.debug(f"Frame {frame_count}, FPS: {current_fps:.2f}")
+            logger.debug(f"Frame {frame_count}, FPS: {current_fps:.2f}")
 
-        logging.info(f"Processed {frame_count} frames.")
+        logger.info(f"Processed {frame_count} frames.")
 
     except Exception as e:
-        logging.error(f"Error during video processing: {e}")
+        logger.error(f"Error during video processing: {e}")
     finally:
-        if "cap" in locals():
+        if cap is not None:
             cap.release()
-        if "out" in locals():
+        if out is not None:
             out.release()
         cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    try:
-        args.source = int(args.source)
-    except ValueError:
-        pass
-    main(args)
+    main(parse_args())
