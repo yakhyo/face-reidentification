@@ -6,7 +6,7 @@
 [![DeepWiki](https://img.shields.io/badge/DeepWiki-Docs-blue)](https://deepwiki.com/yakhyo/face-reidentification)
 
 > [!TIP]
-> The models and functionality in this repository are **integrated into [UniFace](https://github.com/yakhyo/uniface)** — an all-in-one face analysis library.
+> The models and functionality in this repository are **integrated into [UniFace](https://github.com/yakhyo/uniface)** — an all-in-one face analysis library.<br>
 > [![PyPI Version](https://img.shields.io/pypi/v/uniface.svg)](https://pypi.org/project/uniface/) [![GitHub Stars](https://img.shields.io/github/stars/yakhyo/uniface)](https://github.com/yakhyo/uniface/stargazers) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 <!--
@@ -115,7 +115,7 @@ python main.py --source assets/in_video.mp4
 > Use these arguments to customize the recognition behavior:
 
 ```bash
-usage: main.py [-h] [--det-weight DET_WEIGHT] [--rec-weight REC_WEIGHT] 
+usage: main.py [-h] [--det-weight DET_WEIGHT] [--rec-weight REC_WEIGHT]
                [--similarity-thresh SIMILARITY_THRESH] [--confidence-thresh CONFIDENCE_THRESH]
                [--faces-dir FACES_DIR] [--source SOURCE] [--max-num MAX_NUM]
 ```
